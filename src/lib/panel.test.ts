@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computePanel, layoutPanels } from "./panel";
+import { computePanel, layoutPanels, splitBlank } from "./panel";
 import {
   HP_MM,
   PANEL_WIDTH_CLEARANCE,
@@ -290,5 +290,67 @@ describe("layoutPanels", () => {
     const spec = computePanel(8, "3u", "circle");
     const result = layoutPanels([spec], GAP);
     expect(typeof result.placed[0].label).toBe("string");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// splitBlank
+// ---------------------------------------------------------------------------
+
+describe("splitBlank", () => {
+  describe("equal mode", () => {
+    it("returns single panel when hp <= maxHp", () => {
+      expect(splitBlank(16, 20, "equal")).toEqual([16]);
+    });
+
+    it("returns empty array for 0 hp", () => {
+      expect(splitBlank(0, 20, "equal")).toEqual([]);
+    });
+
+    it("splits evenly when divisible", () => {
+      expect(splitBlank(40, 20, "equal")).toEqual([20, 20]);
+    });
+
+    it("splits into near-equal panels when not divisible", () => {
+      // 24hp, max 20 → 2 panels: 12 + 12
+      expect(splitBlank(24, 20, "equal")).toEqual([12, 12]);
+    });
+
+    it("distributes remainder across panels", () => {
+      // 25hp, max 20 → 2 panels: 13 + 12
+      expect(splitBlank(25, 20, "equal")).toEqual([13, 12]);
+    });
+
+    it("handles large gaps needing 3+ panels", () => {
+      // 50hp, max 20 → 3 panels: 17 + 17 + 16
+      const result = splitBlank(50, 20, "equal");
+      expect(result).toHaveLength(3);
+      expect(result.reduce((a, b) => a + b, 0)).toBe(50);
+      expect(Math.max(...result) - Math.min(...result)).toBeLessThanOrEqual(1);
+    });
+
+    it("defaults to equal mode", () => {
+      expect(splitBlank(24, 20)).toEqual([12, 12]);
+    });
+  });
+
+  describe("fill-max mode", () => {
+    it("returns single panel when hp <= maxHp", () => {
+      expect(splitBlank(16, 20, "fill-max")).toEqual([16]);
+    });
+
+    it("fills max first, remainder last", () => {
+      // 24hp, max 20 → 20 + 4
+      expect(splitBlank(24, 20, "fill-max")).toEqual([20, 4]);
+    });
+
+    it("fills multiple max panels", () => {
+      // 50hp, max 20 → 20 + 20 + 10
+      expect(splitBlank(50, 20, "fill-max")).toEqual([20, 20, 10]);
+    });
+
+    it("exact multiple produces equal panels", () => {
+      expect(splitBlank(40, 20, "fill-max")).toEqual([20, 20]);
+    });
   });
 });

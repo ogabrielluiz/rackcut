@@ -41,3 +41,4 @@ export const MIN_GAP = 0.5;
 export const MAX_GAP = 20;
 export const DEFAULT_GAP = 2.0;
 export const SVG_MARGIN = 5.0;
+export const DEFAULT_MAX_BLANK_HP = 20;

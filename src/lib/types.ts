@@ -38,6 +38,8 @@ export interface RackData {
   rows: RackRow[];
 }
 
+export type SplitMode = "equal" | "fill-max";
+
 export class PanelValidationError extends Error {
   constructor(message: string) {
     super(message);

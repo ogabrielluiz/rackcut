@@ -6,14 +6,16 @@ import PanelForm from "@/components/PanelForm";
 import PanelList from "@/components/PanelList";
 import SvgPreview from "@/components/SvgPreview";
 import ModularGridDialog from "@/components/ModularGridDialog";
-import { computePanel, layoutPanels } from "@/lib/panel";
+import { computePanel, layoutPanels, splitBlank } from "@/lib/panel";
 import { generateSvg, downloadSvg } from "@/lib/svg";
-import { DEFAULT_GAP, MIN_GAP, MAX_GAP } from "@/lib/constants";
-import type { PanelEntry, Format, HoleStyle } from "@/lib/types";
+import { DEFAULT_GAP, MIN_GAP, MAX_GAP, DEFAULT_MAX_BLANK_HP } from "@/lib/constants";
+import type { PanelEntry, Format, HoleStyle, SplitMode } from "@/lib/types";
 
 function App() {
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [gap, setGap] = useState(DEFAULT_GAP);
+  const [maxBlankHp, setMaxBlankHp] = useState(DEFAULT_MAX_BLANK_HP);
+  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
 
   function handleAdd(panel: {
     hp: number;
@@ -21,11 +23,16 @@ function App() {
     holeStyle: HoleStyle;
     quantity: number;
   }) {
-    const entry: PanelEntry = {
+    // Split if exceeds max
+    const hpValues = splitBlank(panel.hp, maxBlankHp, splitMode);
+    const entries: PanelEntry[] = hpValues.map((hp) => ({
       id: crypto.randomUUID(),
-      ...panel,
-    };
-    setPanels((prev) => [...prev, entry]);
+      hp,
+      format: panel.format,
+      holeStyle: panel.holeStyle,
+      quantity: panel.quantity,
+    }));
+    setPanels((prev) => [...prev, ...entries]);
   }
 
   function handleUpdateQuantity(id: string, quantity: number) {
@@ -51,16 +58,19 @@ function App() {
 
   const handleModularGridImport = useCallback(
     (blanks: { hp: number; format: Format }[]) => {
-      const entries = blanks.map((b) => ({
-        id: crypto.randomUUID(),
-        hp: b.hp,
-        format: b.format,
-        holeStyle: "slot" as HoleStyle,
-        quantity: 1,
-      }));
+      const entries: PanelEntry[] = blanks.flatMap((b) => {
+        const hpValues = splitBlank(b.hp, maxBlankHp, splitMode);
+        return hpValues.map((hp) => ({
+          id: crypto.randomUUID(),
+          hp,
+          format: b.format,
+          holeStyle: "slot" as HoleStyle,
+          quantity: 1,
+        }));
+      });
       setPanels((prev) => [...prev, ...entries]);
     },
-    []
+    [maxBlankHp, splitMode]
   );
 
   const layoutResult = useMemo(() => {
@@ -108,6 +118,37 @@ function App() {
               className="w-24"
               onChange={handleGapChange}
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="max-blank-hp">Max blank HP</Label>
+            <Input
+              id="max-blank-hp"
+              type="number"
+              value={maxBlankHp}
+              min={1}
+              max={128}
+              className="w-24"
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val) && val >= 1 && val <= 128) {
+                  setMaxBlankHp(val);
+                }
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="split-mode">Split mode</Label>
+            <select
+              id="split-mode"
+              value={splitMode}
+              onChange={(e) => setSplitMode(e.target.value as SplitMode)}
+              className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground"
+            >
+              <option value="equal">Equal</option>
+              <option value="fill-max">Fill max first</option>
+            </select>
           </div>
 
           <ModularGridDialog onImport={handleModularGridImport} />

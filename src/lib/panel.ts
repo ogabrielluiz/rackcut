@@ -67,6 +67,41 @@ export function computePanel(
 }
 
 // ---------------------------------------------------------------------------
+// splitBlank
+// ---------------------------------------------------------------------------
+
+export function splitBlank(
+  hp: number,
+  maxHp: number,
+  mode: "equal" | "fill-max" = "equal"
+): number[] {
+  if (hp <= 0) return [];
+  if (hp <= maxHp) return [hp];
+
+  if (mode === "equal") {
+    const count = Math.ceil(hp / maxHp);
+    const base = Math.floor(hp / count);
+    const remainder = hp - base * count;
+    // Distribute: `remainder` panels get base+1, rest get base
+    const result: number[] = [];
+    for (let i = 0; i < count; i++) {
+      result.push(i < remainder ? base + 1 : base);
+    }
+    return result;
+  }
+
+  // fill-max: fill maxHp panels first, leftover at the end
+  const result: number[] = [];
+  let remaining = hp;
+  while (remaining > 0) {
+    const size = Math.min(remaining, maxHp);
+    result.push(size);
+    remaining -= size;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // layoutPanels
 // ---------------------------------------------------------------------------
 
