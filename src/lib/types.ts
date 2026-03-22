@@ -16,6 +16,8 @@ export interface PlacedPanel {
   x: number;
   y: number;
   label: string;
+  pattern: PatternType;
+  patternSeed: number;
 }
 
 export interface PanelEntry {
@@ -24,6 +26,8 @@ export interface PanelEntry {
   format: Format;
   holeStyle: HoleStyle;
   quantity: number;
+  pattern: PatternType;
+  patternSeed: number;
 }
 
 export interface RackRow {
@@ -39,6 +43,15 @@ export interface RackData {
 }
 
 export type SplitMode = "equal" | "fill-max";
+
+export type PatternType =
+  | "none"
+  | "concentric-circles"
+  | "hex-grid"
+  | "waveform"
+  | "sierpinski"
+  | "radial-burst"
+  | "flow-field";
 
 export class PanelValidationError extends Error {
   constructor(message: string) {

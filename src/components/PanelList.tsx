@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
-import type { Format, PanelEntry } from '@/lib/types'
+import type { Format, PanelEntry, PatternType } from '@/lib/types'
+import { PATTERN_LABELS } from '@/lib/patterns'
 
 const FORMAT_LABELS: Record<Format, string> = {
   '3u': '3U',
@@ -10,6 +11,7 @@ const FORMAT_LABELS: Record<Format, string> = {
 interface PanelListProps {
   panels: PanelEntry[]
   onUpdate: (id: string, quantity: number) => void
+  onUpdatePattern: (id: string, pattern: PatternType) => void
   onRemove: (id: string) => void
   onClear: () => void
 }
@@ -17,6 +19,7 @@ interface PanelListProps {
 export default function PanelList({
   panels,
   onUpdate,
+  onUpdatePattern,
   onRemove,
   onClear,
 }: PanelListProps) {
@@ -36,6 +39,17 @@ export default function PanelList({
             </span>
             <span className="text-muted-foreground text-sm">{formatLabel}</span>
             <span className="text-foreground text-sm">×{panel.quantity}</span>
+
+            <select
+              value={panel.pattern}
+              onChange={(e) => onUpdatePattern(panel.id, e.target.value as PatternType)}
+              className="h-7 rounded-sm border border-input bg-secondary px-2 text-xs text-muted-foreground ml-2"
+              aria-label={`Pattern for ${panelLabel}`}
+            >
+              {Object.entries(PATTERN_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
 
             <div className="ml-auto flex items-center gap-1">
               <Button

@@ -111,15 +111,26 @@ export interface LayoutResult {
   sheetHeight: number;
 }
 
-export function layoutPanels(panels: PanelSpec[], gap: number): LayoutResult {
+export interface PanelInput {
+  spec: PanelSpec;
+  pattern: import("./types").PatternType;
+  patternSeed: number;
+}
+
+export function layoutPanels(panels: (PanelSpec | PanelInput)[], gap: number): LayoutResult {
   if (panels.length === 0) {
     return { placed: [], sheetWidth: 0, sheetHeight: 0 };
   }
 
+  // Normalize inputs
+  const normalized: PanelInput[] = panels.map((p) =>
+    "spec" in p ? p : { spec: p, pattern: "none" as const, patternSeed: 0 }
+  );
+
   // Group panels by height (rounded to 0.01 mm for floating-point safety)
-  const groups = new Map<number, PanelSpec[]>();
-  for (const panel of panels) {
-    const key = Math.round(panel.height * 100) / 100;
+  const groups = new Map<number, PanelInput[]>();
+  for (const panel of normalized) {
+    const key = Math.round(panel.spec.height * 100) / 100;
     if (!groups.has(key)) {
       groups.set(key, []);
     }
@@ -137,11 +148,11 @@ export function layoutPanels(panels: PanelSpec[], gap: number): LayoutResult {
     }
     isFirstRow = false;
 
-    const rowHeight = row[0].height;
+    const rowHeight = row[0].spec.height;
     let currentX = 0;
     let isFirstInRow = true;
 
-    for (const spec of row) {
+    for (const input of row) {
       if (!isFirstInRow) {
         currentX += gap;
       }
@@ -152,10 +163,17 @@ export function layoutPanels(panels: PanelSpec[], gap: number): LayoutResult {
         "1u-intellijel": "1U Intellijel",
         "1u-pulplogic": "1U Pulp Logic",
       };
-      const label = `${spec.hp}HP ${formatLabels[spec.format] || spec.format}`;
-      placed.push({ spec, x: currentX, y: currentY, label });
+      const label = `${input.spec.hp}HP ${formatLabels[input.spec.format] || input.spec.format}`;
+      placed.push({
+        spec: input.spec,
+        x: currentX,
+        y: currentY,
+        label,
+        pattern: input.pattern,
+        patternSeed: input.patternSeed,
+      });
 
-      currentX += spec.width;
+      currentX += input.spec.width;
     }
 
     if (currentX > maxWidth) {

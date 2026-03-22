@@ -7,15 +7,17 @@ import PanelList from "@/components/PanelList";
 import SvgPreview from "@/components/SvgPreview";
 import ModularGridDialog from "@/components/ModularGridDialog";
 import { computePanel, layoutPanels, splitBlank } from "@/lib/panel";
+import { PATTERN_LABELS } from "@/lib/patterns";
 import { generateSvg, downloadSvg } from "@/lib/svg";
 import { DEFAULT_GAP, MIN_GAP, MAX_GAP, DEFAULT_MAX_BLANK_HP } from "@/lib/constants";
-import type { PanelEntry, Format, HoleStyle, SplitMode } from "@/lib/types";
+import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType } from "@/lib/types";
 
 function App() {
   const [panels, setPanels] = useState<PanelEntry[]>([]);
   const [gap, setGap] = useState(DEFAULT_GAP);
   const [maxBlankHp, setMaxBlankHp] = useState(DEFAULT_MAX_BLANK_HP);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
+  const [globalPattern, setGlobalPattern] = useState<PatternType>("none");
 
   function handleAdd(panel: {
     hp: number;
@@ -31,6 +33,8 @@ function App() {
       format: panel.format,
       holeStyle: panel.holeStyle,
       quantity: panel.quantity,
+      pattern: globalPattern,
+      patternSeed: Math.floor(Math.random() * 1000000),
     }));
     setPanels((prev) => [...prev, ...entries]);
   }
@@ -43,6 +47,12 @@ function App() {
 
   function handleRemove(id: string) {
     setPanels((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function handleUpdatePattern(id: string, pattern: PatternType) {
+    setPanels((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, pattern } : p))
+    );
   }
 
   function handleClear() {
@@ -66,19 +76,25 @@ function App() {
           format: b.format,
           holeStyle: "slot" as HoleStyle,
           quantity: 1,
+          pattern: globalPattern,
+          patternSeed: Math.floor(Math.random() * 1000000),
         }));
       });
       setPanels((prev) => [...prev, ...entries]);
     },
-    [maxBlankHp, splitMode]
+    [maxBlankHp, splitMode, globalPattern]
   );
 
   const layoutResult = useMemo(() => {
-    const specs = panels.flatMap((entry) => {
+    const inputs = panels.flatMap((entry) => {
       const spec = computePanel(entry.hp, entry.format, entry.holeStyle);
-      return Array.from({ length: entry.quantity }, () => spec);
+      return Array.from({ length: entry.quantity }, (_, i) => ({
+        spec,
+        pattern: entry.pattern,
+        patternSeed: entry.patternSeed + i, // each copy gets a unique seed
+      }));
     });
-    return layoutPanels(specs, gap);
+    return layoutPanels(inputs, gap);
   }, [panels, gap]);
 
   function handleDownload() {
@@ -151,6 +167,27 @@ function App() {
             </select>
           </div>
 
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="pattern">Engrave pattern</Label>
+            <select
+              id="pattern"
+              value={globalPattern}
+              onChange={(e) => {
+                const newPattern = e.target.value as PatternType;
+                setGlobalPattern(newPattern);
+                // Apply to all existing panels
+                setPanels((prev) =>
+                  prev.map((p) => ({ ...p, pattern: newPattern }))
+                );
+              }}
+              className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground"
+            >
+              {Object.entries(PATTERN_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </div>
+
           <ModularGridDialog onImport={handleModularGridImport} />
 
           <Button
@@ -167,6 +204,7 @@ function App() {
             <PanelList
               panels={panels}
               onUpdate={handleUpdateQuantity}
+              onUpdatePattern={handleUpdatePattern}
               onRemove={handleRemove}
               onClear={handleClear}
             />

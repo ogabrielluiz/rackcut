@@ -1,6 +1,6 @@
-import { useMemo } from "react";
 import type { PlacedPanel } from "@/lib/types";
 import { SVG_MARGIN, SLOT_WIDTH, SLOT_HEIGHT, HOLE_DIAMETER } from "@/lib/constants";
+import { generatePattern } from "@/lib/patterns";
 
 interface SvgPreviewProps {
   placed: PlacedPanel[];
@@ -35,19 +35,30 @@ function PreviewPanel({ pp, index }: { pp: PlacedPanel; index: number }) {
         strokeWidth={0.4}
       />
 
-      {/* Subtle brushed-metal lines */}
-      {Array.from({ length: Math.floor(s.height / 3) }, (_, i) => (
-        <line
-          key={`grain-${i}`}
-          x1={0.5}
-          y1={i * 3 + 1.5}
-          x2={s.width - 0.5}
-          y2={i * 3 + 1.5}
-          stroke={color.stroke}
-          strokeWidth={0.03}
-          opacity={0.15}
+      {/* Engrave pattern */}
+      {pp.pattern !== "none" ? (
+        <g
+          opacity={0.6}
+          dangerouslySetInnerHTML={{
+            __html: generatePattern(pp.pattern, s.width, s.height, pp.patternSeed)
+              .replace(/stroke="#0000FF"/g, `stroke="${color.stroke}"`)
+          }}
         />
-      ))}
+      ) : (
+        /* Subtle brushed-metal lines when no pattern */
+        Array.from({ length: Math.floor(s.height / 3) }, (_, i) => (
+          <line
+            key={`grain-${i}`}
+            x1={0.5}
+            y1={i * 3 + 1.5}
+            x2={s.width - 0.5}
+            y2={i * 3 + 1.5}
+            stroke={color.stroke}
+            strokeWidth={0.03}
+            opacity={0.15}
+          />
+        ))
+      )}
 
       {/* Mounting holes */}
       {s.holes.map(([cx, cy], i) =>

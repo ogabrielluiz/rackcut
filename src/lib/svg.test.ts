@@ -23,6 +23,8 @@ function makePlacedPanel(overrides: Partial<PlacedPanel> = {}): PlacedPanel {
     x: 0,
     y: 0,
     label: "8HP",
+    pattern: "none" as const,
+    patternSeed: 0,
     ...overrides,
   };
 }
@@ -168,115 +170,30 @@ describe("generateSvg", () => {
     });
   });
 
-  describe("engrave label", () => {
-    it("renders a text element with blue stroke for label", () => {
-      const placed = makePlacedPanel({ label: "TestLabel" });
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(label).toBeDefined();
-    });
-
-    it("label text content matches panel label", () => {
-      const placed = makePlacedPanel({ label: "TestLabel" });
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(label?.textContent).toBe("TestLabel");
-    });
-
-    it("label has text-anchor=middle", () => {
-      const placed = makePlacedPanel({ label: "X" });
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(label?.getAttribute("text-anchor")).toBe("middle");
-    });
-
-    it("label has dominant-baseline=central", () => {
-      const placed = makePlacedPanel({ label: "X" });
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(label?.getAttribute("dominant-baseline")).toBe("central");
-    });
-
-    it("label has font-family=monospace", () => {
-      const placed = makePlacedPanel({ label: "X" });
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(label?.getAttribute("font-family")).toBe("monospace");
-    });
-
-    it("label has fill=none", () => {
-      const placed = makePlacedPanel({ label: "X" });
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(label?.getAttribute("fill")).toBe("none");
-    });
-
-    it("label x is centered at panel width/2", () => {
-      const placed = makePlacedPanel();
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      const expectedX = placed.spec.width / 2;
-      expect(Number(label?.getAttribute("x"))).toBeCloseTo(expectedX);
-    });
-
-    it("label y is centered at panel height/2", () => {
-      const placed = makePlacedPanel();
-      const doc = parseSvg(generateSvg([placed], 100, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      const expectedY = placed.spec.height / 2;
-      expect(Number(label?.getAttribute("y"))).toBeCloseTo(expectedY);
-    });
-
-    it("escapes XML special chars in label", () => {
-      const placed = makePlacedPanel({ label: "A&B<C>" });
+  describe("engrave patterns", () => {
+    it("renders no engrave elements when pattern is none", () => {
+      const placed = makePlacedPanel({ pattern: "none" });
       const svg = generateSvg([placed], 100, 150);
-      // Should contain escaped entities, not raw chars inside text
-      expect(svg).toContain("A&amp;B&lt;C&gt;");
+      const doc = parseSvg(svg);
+      const texts = doc.querySelectorAll("text");
+      expect(texts.length).toBe(0);
     });
 
-    it("font size is capped to 4mm maximum", () => {
-      // For a large panel, min(4, width*0.08, height*0.08) = 4
-      const placed = makePlacedPanel({
-        spec: {
-          width: 100,
-          height: 128.5,
-          hp: 20,
-          format: "3u" as Format,
-          holes: [],
-          holeStyle: "slot" as HoleStyle,
-        },
-      });
-      const doc = parseSvg(generateSvg([placed], 200, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      expect(Number(label?.getAttribute("font-size"))).toBeLessThanOrEqual(4);
+    it("renders engrave elements when pattern is set", () => {
+      const placed = makePlacedPanel({ pattern: "concentric-circles", patternSeed: 42 });
+      const svg = generateSvg([placed], 100, 150);
+      const doc = parseSvg(svg);
+      const circles = Array.from(doc.querySelectorAll("circle"));
+      const engraveCircles = circles.filter((c) => c.getAttribute("stroke") === "#0000FF");
+      expect(engraveCircles.length).toBeGreaterThan(0);
     });
 
-    it("font size scales with panel width for narrow panels", () => {
-      // For a narrow panel: width*0.08 < 4 so font-size = width*0.08
-      const placed = makePlacedPanel({
-        spec: {
-          width: 5.08, // 1HP
-          height: 128.5,
-          hp: 1,
-          format: "3u" as Format,
-          holes: [],
-          holeStyle: "slot" as HoleStyle,
-        },
-      });
-      const doc = parseSvg(generateSvg([placed], 200, 150));
-      const texts = Array.from(doc.querySelectorAll("text"));
-      const label = texts.find((t) => t.getAttribute("stroke") === "#0000FF");
-      const expectedSize = Math.min(4, 5.08 * 0.08, 128.5 * 0.08);
-      expect(Number(label?.getAttribute("font-size"))).toBeCloseTo(expectedSize);
+    it("different seeds produce different patterns", () => {
+      const p1 = makePlacedPanel({ pattern: "flow-field", patternSeed: 1 });
+      const p2 = makePlacedPanel({ pattern: "flow-field", patternSeed: 999 });
+      const svg1 = generateSvg([p1], 100, 150);
+      const svg2 = generateSvg([p2], 100, 150);
+      expect(svg1).not.toBe(svg2);
     });
   });
 

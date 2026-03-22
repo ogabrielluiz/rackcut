@@ -1,4 +1,4 @@
-import type { PlacedPanel } from "./types";
+import type { PlacedPanel, PatternType } from "./types";
 import {
   CUT_COLOR,
   ENGRAVE_COLOR,
@@ -8,6 +8,7 @@ import {
   HOLE_DIAMETER,
   SVG_MARGIN,
 } from "./constants";
+import { generatePattern } from "./patterns";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,21 +55,14 @@ export function renderPanel(pp: PlacedPanel): string {
   const { spec, x, y, label } = pp;
   const { width, height, holes, holeStyle } = spec;
 
-  // Font size: capped at 4mm, scales with panel dimensions
-  const fontSize = Math.min(4, width * 0.08, height * 0.08);
-
   // Panel outline
   const outline =
     `<rect x="0" y="0" width="${width}" height="${height}" ` +
     `rx="0.5" ry="0.5" ` +
     `stroke="${CUT_COLOR}" stroke-width="${CUT_STROKE_WIDTH}" fill="none"/>`;
 
-  // Centred engrave label
-  const labelEl =
-    `<text x="${width / 2}" y="${height / 2}" ` +
-    `text-anchor="middle" dominant-baseline="central" ` +
-    `font-family="monospace" font-size="${fontSize}" ` +
-    `stroke="${ENGRAVE_COLOR}" stroke-width="0.05" fill="none">${escapeXml(label)}</text>`;
+  // Engrave pattern (replaces text label)
+  const patternSvg = generatePattern(pp.pattern, width, height, pp.patternSeed);
 
   // Mounting holes
   const holeElements = holes
@@ -84,7 +78,7 @@ export function renderPanel(pp: PlacedPanel): string {
     `<!-- Panel: ${escapeXml(label)} ${width}x${height}mm -->\n` +
     `<g transform="translate(${x}, ${y})">\n` +
     `  ${outline}\n` +
-    `  ${labelEl}\n` +
+    `  ${patternSvg ? `  ${patternSvg}\n` : ""}` +
     `  ${holeElements}\n` +
     `</g>`
   );
