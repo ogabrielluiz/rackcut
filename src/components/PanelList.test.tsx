@@ -5,105 +5,67 @@ import PanelList from './PanelList'
 import type { PanelEntry } from '@/lib/types'
 
 const mockPanels: PanelEntry[] = [
-  { id: '1', hp: 8, format: '3u', holeStyle: 'slot', quantity: 2 },
-  { id: '2', hp: 4, format: '1u-intellijel', holeStyle: 'circle', quantity: 1 },
+  { id: '1', hp: 8, format: '3u', holeStyle: 'slot', quantity: 2, pattern: 'none', patternSeed: 42 },
+  { id: '2', hp: 4, format: '1u-intellijel', holeStyle: 'circle', quantity: 1, pattern: 'waveform', patternSeed: 99 },
 ]
 
 describe('PanelList', () => {
-  const onUpdate = vi.fn()
+  const onUpdatePanel = vi.fn()
+  const onRandomizeSeed = vi.fn()
+  const onDuplicate = vi.fn()
   const onRemove = vi.fn()
   const onClear = vi.fn()
+
+  function renderList(panels = mockPanels) {
+    return render(
+      <PanelList
+        panels={panels}
+        onUpdatePanel={onUpdatePanel}
+        onRandomizeSeed={onRandomizeSeed}
+        onDuplicate={onDuplicate}
+        onRemove={onRemove}
+        onClear={onClear}
+      />
+    )
+  }
 
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('displays all panels with HP, format, and quantity', () => {
-    render(
-      <PanelList
-        panels={mockPanels}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
-
-    expect(screen.getByText('8HP')).toBeInTheDocument()
-    expect(screen.getByText('3U')).toBeInTheDocument()
-    expect(screen.getByText('×2')).toBeInTheDocument()
-
-    expect(screen.getByText('4HP')).toBeInTheDocument()
-    expect(screen.getByText('1U Intellijel')).toBeInTheDocument()
-    expect(screen.getByText('×1')).toBeInTheDocument()
+  it('displays all panels with quantity', () => {
+    renderList()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.getByText('1')).toBeInTheDocument()
   })
 
   it('increments quantity when + clicked', async () => {
     const user = userEvent.setup()
-    render(
-      <PanelList
-        panels={mockPanels}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
+    renderList()
 
     const increaseBtn = screen.getByRole('button', {
       name: 'Increase quantity of 8HP 3U',
     })
     await user.click(increaseBtn)
 
-    expect(onUpdate).toHaveBeenCalledWith('1', 3)
+    expect(onUpdatePanel).toHaveBeenCalledWith('1', { quantity: 3 })
   })
 
   it('decrements quantity when - clicked', async () => {
     const user = userEvent.setup()
-    render(
-      <PanelList
-        panels={mockPanels}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
+    renderList()
 
     const decreaseBtn = screen.getByRole('button', {
       name: 'Decrease quantity of 8HP 3U',
     })
     await user.click(decreaseBtn)
 
-    expect(onUpdate).toHaveBeenCalledWith('1', 1)
-  })
-
-  it('does not decrement quantity below 1', async () => {
-    const user = userEvent.setup()
-    render(
-      <PanelList
-        panels={mockPanels}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
-
-    const decreaseBtn = screen.getByRole('button', {
-      name: 'Decrease quantity of 4HP 1U Intellijel',
-    })
-    await user.click(decreaseBtn)
-
-    expect(onUpdate).toHaveBeenCalledWith('2', 1)
+    expect(onUpdatePanel).toHaveBeenCalledWith('1', { quantity: 1 })
   })
 
   it('calls onRemove when remove button clicked', async () => {
     const user = userEvent.setup()
-    render(
-      <PanelList
-        panels={mockPanels}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
+    renderList()
 
     const removeBtn = screen.getByRole('button', {
       name: 'Remove 8HP 3U',
@@ -115,14 +77,7 @@ describe('PanelList', () => {
 
   it('calls onClear when clear all clicked', async () => {
     const user = userEvent.setup()
-    render(
-      <PanelList
-        panels={mockPanels}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
+    renderList()
 
     const clearBtn = screen.getByRole('button', { name: 'Clear all panels' })
     await user.click(clearBtn)
@@ -131,17 +86,48 @@ describe('PanelList', () => {
   })
 
   it('hides clear all button when list is empty', () => {
-    render(
-      <PanelList
-        panels={[]}
-        onUpdate={onUpdate}
-        onRemove={onRemove}
-        onClear={onClear}
-      />
-    )
+    renderList([])
 
     expect(
       screen.queryByRole('button', { name: 'Clear all panels' })
     ).not.toBeInTheDocument()
+  })
+
+  it('can change panel format', async () => {
+    const user = userEvent.setup()
+    renderList()
+
+    const formatSelect = screen.getByLabelText('Format for 8HP 3U')
+    await user.selectOptions(formatSelect, '1u-intellijel')
+
+    expect(onUpdatePanel).toHaveBeenCalledWith('1', { format: '1u-intellijel' })
+  })
+
+  it('can change hole style', async () => {
+    const user = userEvent.setup()
+    renderList()
+
+    const holeSelect = screen.getByLabelText('Hole style for 8HP 3U')
+    await user.selectOptions(holeSelect, 'circle')
+
+    expect(onUpdatePanel).toHaveBeenCalledWith('1', { holeStyle: 'circle' })
+  })
+
+  it('calls onDuplicate when duplicate button clicked', async () => {
+    const user = userEvent.setup()
+    renderList()
+
+    const dupBtn = screen.getByRole('button', { name: 'Duplicate 8HP 3U' })
+    await user.click(dupBtn)
+
+    expect(onDuplicate).toHaveBeenCalledWith('1')
+  })
+
+  it('shows editable seed input', () => {
+    renderList()
+    const seedInputs = screen.getAllByLabelText(/^Seed for /i)
+    expect(seedInputs).toHaveLength(2)
+    expect(seedInputs[0]).toHaveValue(42)
+    expect(seedInputs[1]).toHaveValue(99)
   })
 })

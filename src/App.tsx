@@ -6,11 +6,13 @@ import PanelForm from "@/components/PanelForm";
 import PanelList from "@/components/PanelList";
 import SvgPreview from "@/components/SvgPreview";
 import ModularGridDialog from "@/components/ModularGridDialog";
+import PatternPreview from "@/components/PatternPreview";
 import { computePanel, layoutPanels, splitBlank } from "@/lib/panel";
-import { PATTERN_LABELS } from "@/lib/patterns";
+import { SORTED_PATTERN_ENTRIES } from "@/lib/patterns";
 import { generateSvg, downloadSvg } from "@/lib/svg";
 import { DEFAULT_GAP, MIN_GAP, MAX_GAP, DEFAULT_MAX_BLANK_HP } from "@/lib/constants";
-import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType } from "@/lib/types";
+import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType, MaterialType } from "@/lib/types";
+import { MATERIAL_CONFIG } from "@/components/SvgPreview";
 
 function App() {
   const [panels, setPanels] = useState<PanelEntry[]>([]);
@@ -18,6 +20,7 @@ function App() {
   const [maxBlankHp, setMaxBlankHp] = useState(DEFAULT_MAX_BLANK_HP);
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
   const [globalPattern, setGlobalPattern] = useState<PatternType>("none");
+  const [material, setMaterial] = useState<MaterialType>("mdf");
 
   function handleAdd(panel: {
     hp: number;
@@ -25,7 +28,6 @@ function App() {
     holeStyle: HoleStyle;
     quantity: number;
   }) {
-    // Split if exceeds max
     const hpValues = splitBlank(panel.hp, maxBlankHp, splitMode);
     const entries: PanelEntry[] = hpValues.map((hp) => ({
       id: crypto.randomUUID(),
@@ -39,9 +41,9 @@ function App() {
     setPanels((prev) => [...prev, ...entries]);
   }
 
-  function handleUpdateQuantity(id: string, quantity: number) {
+  function handleUpdatePanel(id: string, updates: Partial<PanelEntry>) {
     setPanels((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, quantity } : p))
+      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
     );
   }
 
@@ -49,10 +51,20 @@ function App() {
     setPanels((prev) => prev.filter((p) => p.id !== id));
   }
 
-  function handleUpdatePattern(id: string, pattern: PatternType) {
+  function handleRandomizeSeed(id: string) {
     setPanels((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, pattern } : p))
+      prev.map((p) => (p.id === id ? { ...p, patternSeed: Math.floor(Math.random() * 1000000) } : p))
     );
+  }
+
+  function handleDuplicate(id: string) {
+    setPanels((prev) => {
+      const source = prev.find((p) => p.id === id);
+      if (!source) return prev;
+      const copy: PanelEntry = { ...source, id: crypto.randomUUID() };
+      const idx = prev.indexOf(source);
+      return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
+    });
   }
 
   function handleClear() {
@@ -88,10 +100,10 @@ function App() {
   const layoutResult = useMemo(() => {
     const inputs = panels.flatMap((entry) => {
       const spec = computePanel(entry.hp, entry.format, entry.holeStyle);
-      return Array.from({ length: entry.quantity }, (_, i) => ({
+      return Array.from({ length: entry.quantity }, () => ({
         spec,
         pattern: entry.pattern,
-        patternSeed: entry.patternSeed + i, // each copy gets a unique seed
+        patternSeed: entry.patternSeed,
       }));
     });
     return layoutPanels(inputs, gap);
@@ -106,119 +118,206 @@ function App() {
     downloadSvg(svgString, "rackcut.svg");
   }
 
+  const totalPanelCount = panels.reduce((sum, p) => sum + p.quantity, 0);
+
   return (
     <div className="min-h-screen bg-background text-foreground font-mono">
       {/* Header */}
-      <header className="border-b border-border px-6 py-4">
-        <h1 className="text-primary text-2xl font-bold">rackcut</h1>
-        <p className="text-muted-foreground text-sm">
-          Eurorack blank panel SVG generator
-        </p>
+      <header className="border-b border-border px-6 py-5">
+        <div className="max-w-5xl mx-auto flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/rackcut/favicon.svg" alt="rackcut logo" className="h-10 w-10" />
+            <div>
+              <h1 className="text-primary text-2xl font-bold tracking-tight">rackcut</h1>
+              <p className="text-muted-foreground text-sm">
+                Generate laser-cut SVG files for Eurorack blank panels with generative engrave patterns.
+              </p>
+            </div>
+          </div>
+          <p className="text-muted-foreground/40 text-xs mt-1 text-right hidden sm:block">
+            SVG color convention<br />
+            <span className="text-[#FF6666]">red</span> = cut &middot; <span className="text-[#6666FF]">blue</span> = engrave
+          </p>
+        </div>
       </header>
 
-      {/* Main content */}
-      <main className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-6">
-        {/* Controls bar */}
-        <section className="flex flex-wrap items-end gap-6">
-          <PanelForm onAdd={handleAdd} />
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="gap-input">Gap (mm)</Label>
-            <Input
-              id="gap-input"
-              type="number"
-              value={gap}
-              min={MIN_GAP}
-              max={MAX_GAP}
-              step={0.5}
-              className="w-24"
-              onChange={handleGapChange}
-            />
+      <main className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-8">
+        {/* 1. Add Panels */}
+        <section>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">1. Add Panels</h2>
+            <span className="text-muted-foreground/50 text-xs">Manually or import from ModularGrid</span>
           </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="max-blank-hp">Max blank HP</Label>
-            <Input
-              id="max-blank-hp"
-              type="number"
-              value={maxBlankHp}
-              min={1}
-              max={128}
-              className="w-24"
-              onChange={(e) => {
-                const val = parseInt(e.target.value);
-                if (!isNaN(val) && val >= 1 && val <= 128) {
-                  setMaxBlankHp(val);
-                }
-              }}
-            />
+          <div className="flex flex-wrap items-end gap-4 border border-border rounded-sm bg-card/30 p-4">
+            <PanelForm onAdd={handleAdd} />
+            <div className="h-8 w-px bg-border hidden sm:block" />
+            <ModularGridDialog onImport={handleModularGridImport} />
           </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="split-mode">Split mode</Label>
-            <select
-              id="split-mode"
-              value={splitMode}
-              onChange={(e) => setSplitMode(e.target.value as SplitMode)}
-              className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground"
-            >
-              <option value="equal">Equal</option>
-              <option value="fill-max">Fill max first</option>
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="pattern">Engrave pattern</Label>
-            <select
-              id="pattern"
-              value={globalPattern}
-              onChange={(e) => {
-                const newPattern = e.target.value as PatternType;
-                setGlobalPattern(newPattern);
-                // Apply to all existing panels
-                setPanels((prev) =>
-                  prev.map((p) => ({ ...p, pattern: newPattern }))
-                );
-              }}
-              className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground"
-            >
-              {Object.entries(PATTERN_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <ModularGridDialog onImport={handleModularGridImport} />
-
-          <Button
-            onClick={handleDownload}
-            disabled={panels.length === 0}
-          >
-            Download SVG
-          </Button>
         </section>
 
-        {/* Panel list */}
-        {panels.length > 0 && (
-          <section>
+        {/* 2. Configure */}
+        <section>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">2. Configure</h2>
+            <span className="text-muted-foreground/50 text-xs">Sheet layout, auto-splitting, and default pattern for new panels</span>
+          </div>
+          <div className="flex flex-wrap items-start gap-5 border border-border rounded-sm bg-card/30 p-4">
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="gap-input" className="text-xs">Gap (mm)</Label>
+              <Input
+                id="gap-input"
+                type="number"
+                value={gap}
+                min={MIN_GAP}
+                max={MAX_GAP}
+                step={0.5}
+                className="w-20"
+                onChange={handleGapChange}
+                title="Space between panels on the cut sheet"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="max-blank-hp" className="text-xs">Max HP</Label>
+              <Input
+                id="max-blank-hp"
+                type="number"
+                value={maxBlankHp}
+                min={1}
+                max={128}
+                className="w-20"
+                title="Panels larger than this will be split"
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val >= 1 && val <= 128) {
+                    setMaxBlankHp(val);
+                  }
+                }}
+              />
+              <span className="text-[10px] text-muted-foreground/40">splits larger</span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="split-mode" className="text-xs">Split mode</Label>
+              <select
+                id="split-mode"
+                value={splitMode}
+                onChange={(e) => setSplitMode(e.target.value as SplitMode)}
+                className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                title="Equal: same-sized panels. Fill max: maximum size first, remainder last."
+              >
+                <option value="equal">Equal sizes</option>
+                <option value="fill-max">Fill max first</option>
+              </select>
+            </div>
+
+            <div className="h-8 w-px bg-border hidden sm:block" />
+
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="pattern" className="text-xs">Default pattern</Label>
+              <div className="flex gap-1.5">
+                <select
+                  id="pattern"
+                  value={globalPattern}
+                  onChange={(e) => setGlobalPattern(e.target.value as PatternType)}
+                  className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  title="Pattern applied to newly added panels"
+                >
+                  {SORTED_PATTERN_ENTRIES.map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+                {panels.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 text-xs whitespace-nowrap"
+                    title="Apply this pattern to all existing panels"
+                    onClick={() => setPanels((prev) => prev.map((p) => ({ ...p, pattern: globalPattern })))}
+                  >
+                    Apply to all
+                  </Button>
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground/40">for new panels</span>
+            </div>
+
+            <div className="h-8 w-px bg-border hidden sm:block" />
+
+            <PatternPreview />
+          </div>
+        </section>
+
+        {/* 3. Your Panels */}
+        <section>
+          <div className="flex items-baseline gap-2 mb-3">
+            <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">3. Your Panels</h2>
+            {panels.length > 0 ? (
+              <span className="text-muted-foreground/50 text-xs">
+                {panels.length} {panels.length === 1 ? "panel" : "panels"}, {totalPanelCount} total on sheet &middot; edit any field inline
+              </span>
+            ) : (
+              <span className="text-muted-foreground/50 text-xs">No panels yet &mdash; add panels above to get started</span>
+            )}
+          </div>
+          {panels.length > 0 && (
             <PanelList
               panels={panels}
-              onUpdate={handleUpdateQuantity}
-              onUpdatePattern={handleUpdatePattern}
+              onUpdatePanel={handleUpdatePanel}
+              onRandomizeSeed={handleRandomizeSeed}
+              onDuplicate={handleDuplicate}
               onRemove={handleRemove}
               onClear={handleClear}
             />
-          </section>
-        )}
+          )}
+        </section>
 
-        {/* SVG preview */}
+        {/* 4. Preview & Download */}
         <section>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">4. Preview & Download</h2>
+              {panels.length > 0 && (
+                <span className="text-muted-foreground/50 text-xs">
+                  {layoutResult.sheetWidth.toFixed(1)} x {layoutResult.sheetHeight.toFixed(1)} mm
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="material" className="text-xs text-muted-foreground/50">Material:</label>
+                <select
+                  id="material"
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value as MaterialType)}
+                  className="h-7 rounded-sm border border-input bg-secondary px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  title="Preview appearance only -- does not affect the downloaded SVG"
+                >
+                  {Object.entries(MATERIAL_CONFIG).map(([value, config]) => (
+                    <option key={value} value={value}>{config.label}</option>
+                  ))}
+                </select>
+              </div>
+              {panels.length > 0 && (
+                <Button onClick={handleDownload}>Download SVG</Button>
+              )}
+            </div>
+          </div>
           <SvgPreview
             placed={layoutResult.placed}
             sheetWidth={layoutResult.sheetWidth}
             sheetHeight={layoutResult.sheetHeight}
+            material={material}
           />
         </section>
+
+        {/* Footer */}
+        <footer className="border-t border-border pt-4 pb-8 flex flex-col items-center gap-3">
+          <a href="https://www.buymeacoffee.com/ogabrielluiz" target="_blank" rel="noopener noreferrer">
+            <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-[60px] w-[217px]" />
+          </a>
+          <p className="text-muted-foreground/40 text-xs">rackcut is open source.</p>
+        </footer>
       </main>
     </div>
   );
