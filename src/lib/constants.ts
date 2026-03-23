@@ -8,7 +8,7 @@ export const PANEL_HEIGHT_1U_INTELLIJEL = 39.65;
 export const PANEL_HEIGHT_1U_PULPLOGIC = 43.18;
 
 export const HOLE_DIAMETER = 3.2;
-export const SLOT_WIDTH = 3.5;
+export const SLOT_WIDTH = 4.0;
 export const SLOT_HEIGHT = 3.2;
 
 export const HOLE_EDGE_OFFSET_H = 7.5;

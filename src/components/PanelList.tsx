@@ -155,7 +155,7 @@ export default function PanelList({
                 id={`pat-${panel.id}`}
                 value={panel.pattern}
                 onChange={(e) => onUpdatePanel(panel.id, { pattern: e.target.value as PatternType })}
-                className={`h-9 px-1.5 text-xs text-muted-foreground flex-1 min-w-[120px] ${selectBase}`}
+                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
                 aria-label={`Pattern for ${panelLabel}`}
               >
                 {SORTED_PATTERN_ENTRIES.map(([value, label]) => (
