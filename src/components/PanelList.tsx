@@ -45,14 +45,20 @@ export default function PanelList({
               <input
                 id={`hp-${panel.id}`}
                 type="number"
-                value={panel.hp}
                 min={MIN_HP}
                 max={MAX_HP}
-                onChange={(e) => {
+                defaultValue={panel.hp}
+                key={`hp-${panel.id}-${panel.hp}`}
+                onBlur={(e) => {
                   const val = parseInt(e.target.value);
                   if (!isNaN(val) && val >= MIN_HP && val <= MAX_HP) {
                     onUpdatePanel(panel.id, { hp: val });
+                  } else {
+                    e.target.value = String(panel.hp);
                   }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
                 className={`w-14 h-7 px-1.5 text-sm text-primary font-semibold text-center ${selectBase}`}
                 aria-label={`HP for ${panelLabel}`}
@@ -147,12 +153,19 @@ export default function PanelList({
                 <input
                   id={`seed-${panel.id}`}
                   type="number"
-                  value={panel.patternSeed}
-                  onChange={(e) => {
+                  min={0}
+                  defaultValue={panel.patternSeed}
+                  key={`seed-${panel.id}-${panel.patternSeed}`}
+                  onBlur={(e) => {
                     const val = parseInt(e.target.value);
                     if (!isNaN(val) && val >= 0) {
                       onUpdatePanel(panel.id, { patternSeed: val });
+                    } else {
+                      e.target.value = String(panel.patternSeed);
                     }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
                   className={`w-20 h-7 px-1.5 text-xs text-muted-foreground/60 font-mono tabular-nums text-center ${selectBase}`}
                   title="Pattern seed -- same seed + pattern = same result"
