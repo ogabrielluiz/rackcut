@@ -37,7 +37,7 @@ export default function PanelList({
         return (
           <div
             key={panel.id}
-            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-card px-3 py-2"
+            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-border bg-card px-3 py-2"
           >
             {/* HP */}
             <div className="flex items-center gap-1">
@@ -137,7 +137,12 @@ export default function PanelList({
                   onClick={() => onRandomizeSeed(panel.id)}
                   title="Randomize seed"
                 >
-                  <span className="text-sm">&#x21bb;</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 2v6h-6"/>
+                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+                    <path d="M3 22v-6h6"/>
+                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                  </svg>
                 </Button>
                 <input
                   id={`seed-${panel.id}`}
@@ -160,7 +165,10 @@ export default function PanelList({
                   onClick={() => navigator.clipboard.writeText(String(panel.patternSeed))}
                   title="Copy seed"
                 >
-                  <span className="text-sm">&#x2398;</span>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                  </svg>
                 </Button>
               </div>
             </div>
@@ -169,21 +177,28 @@ export default function PanelList({
             <div className="ml-auto flex items-center gap-1">
               <Button
                 variant="ghost"
-                size="sm"
-                className="text-xs px-2"
+                size="icon-xs"
                 aria-label={`Duplicate ${panelLabel}`}
                 onClick={() => onDuplicate(panel.id)}
                 title="Duplicate this panel"
               >
-                Dup
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                </svg>
               </Button>
               <Button
                 variant="ghost"
                 size="icon-xs"
                 aria-label={`Remove ${panelLabel}`}
                 onClick={() => onRemove(panel.id)}
+                title="Remove this panel"
               >
-                <span className="text-sm">&times;</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18"/>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
               </Button>
             </div>
           </div>
