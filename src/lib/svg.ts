@@ -1,4 +1,4 @@
-import type { PlacedPanel, PatternType } from "./types";
+import type { PlacedPanel } from "./types";
 import {
   CUT_COLOR,
   ENGRAVE_COLOR,
