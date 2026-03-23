@@ -271,18 +271,18 @@ function App() {
 
         {/* 4. Preview & Download */}
         <section>
-          <div className="flex flex-wrap items-start gap-x-3 gap-y-2 mb-3">
-            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 flex-1 min-w-0">
-              <h2 className="text-primary text-sm font-semibold uppercase tracking-wider whitespace-nowrap">4. Preview & Download</h2>
+          <div className="mb-3 space-y-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">4. Preview & Download</h2>
               {panels.length > 0 && (
-                <span className="text-muted-foreground/50 text-xs whitespace-nowrap">
+                <span className="text-muted-foreground/50 text-xs">
                   {layoutResult.sheetWidth.toFixed(1)} x {layoutResult.sheetHeight.toFixed(1)} mm
                 </span>
               )}
             </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5">
-                <label htmlFor="material" className="text-xs text-muted-foreground/50 whitespace-nowrap">Material:</label>
+                <label htmlFor="material" className="text-xs text-muted-foreground/50">Material:</label>
                 <select
                   id="material"
                   value={material}
@@ -295,10 +295,10 @@ function App() {
                   ))}
                 </select>
               </div>
-              <span className="text-muted-foreground/40 text-xs hidden sm:block">
+              <span className="text-muted-foreground/40 text-xs hidden sm:inline">
                 <span className="text-[#FF6666]">red</span> = cut &middot; <span className="text-[#6666FF]">blue</span> = engrave
               </span>
-              <Button onClick={handleDownload} disabled={panels.length === 0}>
+              <Button onClick={handleDownload} disabled={panels.length === 0} className="w-full sm:w-auto">
                 Download SVG
               </Button>
             </div>
