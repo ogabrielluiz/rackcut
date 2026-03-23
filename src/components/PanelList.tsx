@@ -37,97 +37,125 @@ export default function PanelList({
         return (
           <div
             key={panel.id}
-            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-card px-3 py-2.5"
+            className="rounded-md border border-border bg-card px-3 py-2.5"
           >
-            {/* HP */}
-            <div className="flex items-center gap-1">
-              <label className="text-[10px] text-muted-foreground/50" htmlFor={`hp-${panel.id}`}>HP</label>
-              <input
-                id={`hp-${panel.id}`}
-                type="number"
-                min={MIN_HP}
-                max={MAX_HP}
-                defaultValue={panel.hp}
-                key={`hp-${panel.id}-${panel.hp}`}
-                onBlur={(e) => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val) && val >= MIN_HP && val <= MAX_HP) {
-                    onUpdatePanel(panel.id, { hp: val });
-                  } else {
-                    e.target.value = String(panel.hp);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                }}
-                className={`w-14 h-9 px-1.5 text-sm text-primary font-semibold text-center ${selectBase}`}
-                aria-label={`HP for ${panelLabel}`}
-              />
-            </div>
+            {/* Row 1: HP, Format, Holes, Qty, Actions */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] text-muted-foreground/50" htmlFor={`hp-${panel.id}`}>HP</label>
+                <input
+                  id={`hp-${panel.id}`}
+                  type="number"
+                  min={MIN_HP}
+                  max={MAX_HP}
+                  defaultValue={panel.hp}
+                  key={`hp-${panel.id}-${panel.hp}`}
+                  onBlur={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= MIN_HP && val <= MAX_HP) {
+                      onUpdatePanel(panel.id, { hp: val });
+                    } else {
+                      e.target.value = String(panel.hp);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                  }}
+                  className={`w-14 h-9 px-1.5 text-sm text-primary font-semibold text-center ${selectBase}`}
+                  aria-label={`HP for ${panelLabel}`}
+                />
+              </div>
 
-            {/* Format */}
-            <div className="flex items-center gap-1">
-              <label className="text-[10px] text-muted-foreground/50" htmlFor={`fmt-${panel.id}`}>Format</label>
-              <select
-                id={`fmt-${panel.id}`}
-                value={panel.format}
-                onChange={(e) => onUpdatePanel(panel.id, { format: e.target.value as Format })}
-                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
-                aria-label={`Format for ${panelLabel}`}
-              >
-                {FORMAT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] text-muted-foreground/50" htmlFor={`fmt-${panel.id}`}>Format</label>
+                <select
+                  id={`fmt-${panel.id}`}
+                  value={panel.format}
+                  onChange={(e) => onUpdatePanel(panel.id, { format: e.target.value as Format })}
+                  className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
+                  aria-label={`Format for ${panelLabel}`}
+                >
+                  {FORMAT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Hole style */}
-            <div className="flex items-center gap-1">
-              <label className="text-[10px] text-muted-foreground/50" htmlFor={`holes-${panel.id}`}>Holes</label>
-              <select
-                id={`holes-${panel.id}`}
-                value={panel.holeStyle}
-                onChange={(e) => onUpdatePanel(panel.id, { holeStyle: e.target.value as HoleStyle })}
-                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
-                aria-label={`Hole style for ${panelLabel}`}
-              >
-                <option value="slot">Slot</option>
-                <option value="circle">Circle</option>
-              </select>
-            </div>
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] text-muted-foreground/50" htmlFor={`holes-${panel.id}`}>Holes</label>
+                <select
+                  id={`holes-${panel.id}`}
+                  value={panel.holeStyle}
+                  onChange={(e) => onUpdatePanel(panel.id, { holeStyle: e.target.value as HoleStyle })}
+                  className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
+                  aria-label={`Hole style for ${panelLabel}`}
+                >
+                  <option value="slot">Slot</option>
+                  <option value="circle">Circle</option>
+                </select>
+              </div>
 
-            {/* Quantity */}
-            <div className="flex items-center gap-1">
-              <label className="text-[10px] text-muted-foreground/50">Qty</label>
-              <div className="flex items-center">
+              <div className="flex items-center gap-1">
+                <label className="text-[10px] text-muted-foreground/50">Qty</label>
+                <div className="flex items-center">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Decrease quantity of ${panelLabel}`}
+                    onClick={() => onUpdatePanel(panel.id, { quantity: Math.max(1, panel.quantity - 1) })}
+                  >
+                    -
+                  </Button>
+                  <span className="text-foreground text-sm w-6 text-center" aria-live="polite">{panel.quantity}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Increase quantity of ${panelLabel}`}
+                    onClick={() => onUpdatePanel(panel.id, { quantity: Math.min(100, panel.quantity + 1) })}
+                  >
+                    +
+                  </Button>
+                </div>
+              </div>
+
+              {/* Actions — always at end of first row */}
+              <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Decrease quantity of ${panelLabel}`}
-                  onClick={() => onUpdatePanel(panel.id, { quantity: Math.max(1, panel.quantity - 1) })}
+                  aria-label={`Duplicate ${panelLabel}`}
+                  onClick={() => onDuplicate(panel.id)}
+                  title="Duplicate this panel"
                 >
-                  -
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
                 </Button>
-                <span className="text-foreground text-sm w-6 text-center" aria-live="polite">{panel.quantity}</span>
                 <Button
                   variant="ghost"
                   size="icon-sm"
-                  aria-label={`Increase quantity of ${panelLabel}`}
-                  onClick={() => onUpdatePanel(panel.id, { quantity: Math.min(100, panel.quantity + 1) })}
+                  aria-label={`Remove ${panelLabel}`}
+                  onClick={() => onRemove(panel.id)}
+                  title="Remove this panel"
                 >
-                  +
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
+                    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
                 </Button>
               </div>
             </div>
 
-            {/* Pattern + seed — wrap as a unit on small screens */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            {/* Row 2: Pattern + seed */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-2 pt-2 border-t border-border/50">
               <label className="text-[10px] text-muted-foreground/50" htmlFor={`pat-${panel.id}`}>Pattern</label>
               <select
                 id={`pat-${panel.id}`}
                 value={panel.pattern}
                 onChange={(e) => onUpdatePanel(panel.id, { pattern: e.target.value as PatternType })}
-                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
+                className={`h-9 px-1.5 text-xs text-muted-foreground flex-1 min-w-[120px] ${selectBase}`}
                 aria-label={`Pattern for ${panelLabel}`}
               >
                 {SORTED_PATTERN_ENTRIES.map(([value, label]) => (
@@ -135,82 +163,51 @@ export default function PanelList({
                 ))}
               </select>
 
-              <div className="flex items-center gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Randomize pattern for ${panelLabel}`}
-                  onClick={() => onRandomizeSeed(panel.id)}
-                  title="Randomize seed"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 2v6h-6"/>
-                    <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-                    <path d="M3 22v-6h6"/>
-                    <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                  </svg>
-                </Button>
-                <input
-                  id={`seed-${panel.id}`}
-                  type="number"
-                  min={0}
-                  defaultValue={panel.patternSeed}
-                  key={`seed-${panel.id}-${panel.patternSeed}`}
-                  onBlur={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 0) {
-                      onUpdatePanel(panel.id, { patternSeed: val });
-                    } else {
-                      e.target.value = String(panel.patternSeed);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                  }}
-                  className={`w-20 h-9 px-1.5 text-xs text-muted-foreground/60 font-mono tabular-nums text-center ${selectBase}`}
-                  title="Pattern seed -- same seed + pattern = same result"
-                  aria-label={`Seed for ${panelLabel}`}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Copy seed for ${panelLabel}`}
-                  onClick={() => navigator.clipboard.writeText(String(panel.patternSeed))}
-                  title="Copy seed"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-                  </svg>
-                </Button>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="ml-auto flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Duplicate ${panelLabel}`}
-                onClick={() => onDuplicate(panel.id)}
-                title="Duplicate this panel"
+                aria-label={`Randomize pattern for ${panelLabel}`}
+                onClick={() => onRandomizeSeed(panel.id)}
+                title="Randomize seed"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  <path d="M21 2v6h-6"/>
+                  <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+                  <path d="M3 22v-6h6"/>
+                  <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
                 </svg>
               </Button>
+              <input
+                id={`seed-${panel.id}`}
+                type="number"
+                min={0}
+                defaultValue={panel.patternSeed}
+                key={`seed-${panel.id}-${panel.patternSeed}`}
+                onBlur={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val >= 0) {
+                    onUpdatePanel(panel.id, { patternSeed: val });
+                  } else {
+                    e.target.value = String(panel.patternSeed);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+                className={`w-20 h-9 px-1.5 text-xs text-muted-foreground/60 font-mono tabular-nums text-center ${selectBase}`}
+                title="Pattern seed -- same seed + pattern = same result"
+                aria-label={`Seed for ${panelLabel}`}
+              />
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Remove ${panelLabel}`}
-                onClick={() => onRemove(panel.id)}
-                title="Remove this panel"
+                aria-label={`Copy seed for ${panelLabel}`}
+                onClick={() => navigator.clipboard.writeText(String(panel.patternSeed))}
+                title="Copy seed"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18"/>
-                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>
-                  <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                  <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
                 </svg>
               </Button>
             </div>

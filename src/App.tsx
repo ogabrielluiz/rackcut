@@ -31,7 +31,7 @@ function App() {
   }) {
     const hpValues = splitBlank(panel.hp, maxBlankHp, splitMode);
     const entries: PanelEntry[] = hpValues.map((hp) => ({
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
       hp,
       format: panel.format,
       holeStyle: panel.holeStyle,
@@ -62,7 +62,7 @@ function App() {
     setPanels((prev) => {
       const source = prev.find((p) => p.id === id);
       if (!source) return prev;
-      const copy: PanelEntry = { ...source, id: crypto.randomUUID() };
+      const copy: PanelEntry = { ...source, id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) };
       const idx = prev.indexOf(source);
       return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
     });
@@ -84,7 +84,7 @@ function App() {
       const entries: PanelEntry[] = blanks.flatMap((b) => {
         const hpValues = splitBlank(b.hp, maxBlankHp, splitMode);
         return hpValues.map((hp) => ({
-          id: crypto.randomUUID(),
+          id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
           hp,
           format: b.format,
           holeStyle: "slot" as HoleStyle,
