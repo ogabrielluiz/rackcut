@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 test.describe("rackcut", () => {
   test("shows empty state on load", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("rackcut")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "rackcut" })).toBeVisible();
     await expect(page.getByText(/add panels to preview/i)).toBeVisible();
   });
 
@@ -14,14 +14,14 @@ test.describe("rackcut", () => {
     await page.getByLabel(/^HP$/i).fill("8");
     await page.getByRole("button", { name: /^add$/i }).click();
 
-    // Panel appears in list
-    await expect(page.getByText("8HP", { exact: true })).toBeVisible();
+    // Panel appears in list (HP is now an input)
+    await expect(page.getByLabel(/^HP for /i).first()).toBeVisible();
 
-    // SVG preview appears
-    await expect(page.locator("svg")).toBeVisible();
+    // SVG preview appears (the large preview SVG, not icon SVGs)
+    await expect(page.locator("svg.max-w-full")).toBeVisible();
     await expect(page.getByText(/add panels to preview/i)).not.toBeVisible();
 
-    // Download button appears (enabled)
+    // Download button is enabled
     const downloadButton = page.getByRole("button", { name: /download/i });
     await expect(downloadButton).toBeVisible();
     await expect(downloadButton).toBeEnabled();
@@ -40,7 +40,8 @@ test.describe("rackcut", () => {
     await page.getByLabel(/^HP$/i).fill("10");
     await page.getByRole("button", { name: /^add$/i }).click();
 
-    await expect(page.getByText("10HP", { exact: true })).toBeVisible();
+    // Panel appears
+    await expect(page.getByLabel(/^HP for /i).first()).toBeVisible();
 
     // Remove
     await page.getByRole("button", { name: /remove/i }).click();
@@ -53,12 +54,13 @@ test.describe("rackcut", () => {
     await page.getByLabel(/^HP$/i).fill("8");
     await page.getByRole("button", { name: /^add$/i }).click();
 
-    await expect(page.getByText(/×1/)).toBeVisible();
+    // Check initial quantity
+    await expect(page.getByText("1", { exact: true }).first()).toBeVisible();
 
     await page.getByRole("button", { name: /increase/i }).click();
-    await expect(page.getByText(/×2/)).toBeVisible();
+    await expect(page.getByText("2", { exact: true }).first()).toBeVisible();
 
     await page.getByRole("button", { name: /decrease/i }).click();
-    await expect(page.getByText(/×1/)).toBeVisible();
+    await expect(page.getByText("1", { exact: true }).first()).toBeVisible();
   });
 });
