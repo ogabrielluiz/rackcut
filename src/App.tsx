@@ -13,6 +13,7 @@ import { generateSvg, downloadSvg } from "@/lib/svg";
 import { DEFAULT_GAP, MIN_GAP, MAX_GAP, DEFAULT_MAX_BLANK_HP } from "@/lib/constants";
 import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType, MaterialType } from "@/lib/types";
 import { MATERIAL_CONFIG } from "@/components/SvgPreview";
+import faviconUrl from "/favicon.svg?url";
 
 function App() {
   const [panels, setPanels] = useState<PanelEntry[]>([]);
@@ -126,7 +127,7 @@ function App() {
       <header className="border-b border-border px-6 py-5">
         <div className="max-w-5xl mx-auto flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <img src="/rackcut/favicon.svg" alt="rackcut logo" className="h-10 w-10" />
+            <img src={faviconUrl} alt="rackcut logo" className="h-10 w-10" />
             <div>
               <h1 className="text-primary text-2xl font-bold tracking-tight">rackcut</h1>
               <p className="text-muted-foreground text-sm">
