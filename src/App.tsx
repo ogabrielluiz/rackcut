@@ -135,10 +135,6 @@ function App() {
               </p>
             </div>
           </div>
-          <p className="text-muted-foreground/40 text-xs mt-1 text-right hidden sm:block">
-            SVG color convention<br />
-            <span className="text-[#FF6666]">red</span> = cut &middot; <span className="text-[#6666FF]">blue</span> = engrave
-          </p>
         </div>
       </header>
 
@@ -299,9 +295,12 @@ function App() {
                   ))}
                 </select>
               </div>
-              {panels.length > 0 && (
-                <Button onClick={handleDownload}>Download SVG</Button>
-              )}
+              <span className="text-muted-foreground/40 text-xs hidden sm:block">
+                <span className="text-[#FF6666]">red</span> = cut &middot; <span className="text-[#6666FF]">blue</span> = engrave
+              </span>
+              <Button onClick={handleDownload} disabled={panels.length === 0}>
+                Download SVG
+              </Button>
             </div>
           </div>
           <SvgPreview
