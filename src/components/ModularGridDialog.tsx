@@ -146,6 +146,7 @@ export default function ModularGridDialog({ onImport }: ModularGridDialogProps) 
           {/* URL input */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="mg-url-input">Rack URL</Label>
+            <div className="flex flex-col sm:flex-row gap-2">
             <Input
               id="mg-url-input"
               type="url"
@@ -153,7 +154,9 @@ export default function ModularGridDialog({ onImport }: ModularGridDialogProps) 
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               disabled={loading}
+              className="min-w-0"
             />
+            </div>
           </div>
 
           {/* Error message */}

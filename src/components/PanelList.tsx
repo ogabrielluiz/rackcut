@@ -9,7 +9,7 @@ const FORMAT_OPTIONS: { value: Format; label: string }[] = [
   { value: '1u-pulplogic', label: '1U Pulp Logic' },
 ]
 
-const selectBase = "rounded-sm border border-input bg-secondary text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+const selectBase = "rounded-sm border border-input bg-secondary text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 touch-manipulation"
 
 interface PanelListProps {
   panels: PanelEntry[]
@@ -37,7 +37,7 @@ export default function PanelList({
         return (
           <div
             key={panel.id}
-            className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-border bg-card px-3 py-2"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border bg-card px-3 py-2.5"
           >
             {/* HP */}
             <div className="flex items-center gap-1">
@@ -60,7 +60,7 @@ export default function PanelList({
                 onKeyDown={(e) => {
                   if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                 }}
-                className={`w-14 h-7 px-1.5 text-sm text-primary font-semibold text-center ${selectBase}`}
+                className={`w-14 h-9 px-1.5 text-sm text-primary font-semibold text-center ${selectBase}`}
                 aria-label={`HP for ${panelLabel}`}
               />
             </div>
@@ -72,7 +72,7 @@ export default function PanelList({
                 id={`fmt-${panel.id}`}
                 value={panel.format}
                 onChange={(e) => onUpdatePanel(panel.id, { format: e.target.value as Format })}
-                className={`h-7 px-1.5 text-xs text-muted-foreground ${selectBase}`}
+                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
                 aria-label={`Format for ${panelLabel}`}
               >
                 {FORMAT_OPTIONS.map((opt) => (
@@ -88,7 +88,7 @@ export default function PanelList({
                 id={`holes-${panel.id}`}
                 value={panel.holeStyle}
                 onChange={(e) => onUpdatePanel(panel.id, { holeStyle: e.target.value as HoleStyle })}
-                className={`h-7 px-1.5 text-xs text-muted-foreground ${selectBase}`}
+                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
                 aria-label={`Hole style for ${panelLabel}`}
               >
                 <option value="slot">Slot</option>
@@ -102,7 +102,7 @@ export default function PanelList({
               <div className="flex items-center">
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-sm"
                   aria-label={`Decrease quantity of ${panelLabel}`}
                   onClick={() => onUpdatePanel(panel.id, { quantity: Math.max(1, panel.quantity - 1) })}
                 >
@@ -111,7 +111,7 @@ export default function PanelList({
                 <span className="text-foreground text-sm w-6 text-center" aria-live="polite">{panel.quantity}</span>
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-sm"
                   aria-label={`Increase quantity of ${panelLabel}`}
                   onClick={() => onUpdatePanel(panel.id, { quantity: Math.min(100, panel.quantity + 1) })}
                 >
@@ -120,14 +120,14 @@ export default function PanelList({
               </div>
             </div>
 
-            {/* Pattern + seed */}
+            {/* Pattern + seed — wrap as a unit on small screens */}
             <div className="flex flex-wrap items-center gap-1.5">
               <label className="text-[10px] text-muted-foreground/50" htmlFor={`pat-${panel.id}`}>Pattern</label>
               <select
                 id={`pat-${panel.id}`}
                 value={panel.pattern}
                 onChange={(e) => onUpdatePanel(panel.id, { pattern: e.target.value as PatternType })}
-                className={`h-7 px-1.5 text-xs text-muted-foreground ${selectBase}`}
+                className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
                 aria-label={`Pattern for ${panelLabel}`}
               >
                 {SORTED_PATTERN_ENTRIES.map(([value, label]) => (
@@ -138,7 +138,7 @@ export default function PanelList({
               <div className="flex items-center gap-0.5">
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-sm"
                   aria-label={`Randomize pattern for ${panelLabel}`}
                   onClick={() => onRandomizeSeed(panel.id)}
                   title="Randomize seed"
@@ -167,13 +167,13 @@ export default function PanelList({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                   }}
-                  className={`w-20 h-7 px-1.5 text-xs text-muted-foreground/60 font-mono tabular-nums text-center ${selectBase}`}
+                  className={`w-20 h-9 px-1.5 text-xs text-muted-foreground/60 font-mono tabular-nums text-center ${selectBase}`}
                   title="Pattern seed -- same seed + pattern = same result"
                   aria-label={`Seed for ${panelLabel}`}
                 />
                 <Button
                   variant="ghost"
-                  size="icon-xs"
+                  size="icon-sm"
                   aria-label={`Copy seed for ${panelLabel}`}
                   onClick={() => navigator.clipboard.writeText(String(panel.patternSeed))}
                   title="Copy seed"
@@ -190,7 +190,7 @@ export default function PanelList({
             <div className="ml-auto flex items-center gap-1">
               <Button
                 variant="ghost"
-                size="icon-xs"
+                size="icon-sm"
                 aria-label={`Duplicate ${panelLabel}`}
                 onClick={() => onDuplicate(panel.id)}
                 title="Duplicate this panel"
@@ -202,7 +202,7 @@ export default function PanelList({
               </Button>
               <Button
                 variant="ghost"
-                size="icon-xs"
+                size="icon-sm"
                 aria-label={`Remove ${panelLabel}`}
                 onClick={() => onRemove(panel.id)}
                 title="Remove this panel"
