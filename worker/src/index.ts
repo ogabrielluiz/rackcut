@@ -95,7 +95,7 @@ export async function handleRequest(
 
 export default {
   async fetch(request: Request, env: any): Promise<Response> {
-    const allowedOrigin = env.ALLOWED_ORIGIN || "*";
+    const allowedOrigin = env.ALLOWED_ORIGIN || "https://ogabrielluiz.github.io";
     return handleRequest(request, allowedOrigin);
   },
 };

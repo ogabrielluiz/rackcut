@@ -12,6 +12,8 @@ dist/
 dist-ssr
 .superpowers/
 *.local
+.env
+.env.*
 test-results/
 
 # Editor directories and files

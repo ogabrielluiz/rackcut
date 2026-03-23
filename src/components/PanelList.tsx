@@ -107,7 +107,7 @@ export default function PanelList({
                   variant="ghost"
                   size="icon-xs"
                   aria-label={`Increase quantity of ${panelLabel}`}
-                  onClick={() => onUpdatePanel(panel.id, { quantity: panel.quantity + 1 })}
+                  onClick={() => onUpdatePanel(panel.id, { quantity: Math.min(100, panel.quantity + 1) })}
                 >
                   +
                 </Button>
