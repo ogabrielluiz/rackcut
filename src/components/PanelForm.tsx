@@ -39,7 +39,7 @@ export default function PanelForm({ onAdd }: PanelFormProps) {
   }
 
   const selectClass =
-    "h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
+    "h-10 sm:h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 dark:bg-input/30";
 
   return (
     <form
@@ -55,7 +55,7 @@ export default function PanelForm({ onAdd }: PanelFormProps) {
           value={hp}
           min={MIN_HP}
           max={MAX_HP}
-          className="w-20"
+          className="w-20 h-10 sm:h-9"
           onChange={(e) => setHp(Number(e.target.value))}
         />
       </div>
@@ -94,12 +94,12 @@ export default function PanelForm({ onAdd }: PanelFormProps) {
           type="number"
           value={quantity}
           min={1}
-          className="w-20"
+          className="w-20 h-10 sm:h-9"
           onChange={(e) => setQuantity(Number(e.target.value))}
         />
       </div>
 
-      <Button type="submit">Add</Button>
+      <Button type="submit" className="h-10 sm:h-9">Add</Button>
 
       {error && (
         <p className="w-full text-sm text-destructive">{error}</p>

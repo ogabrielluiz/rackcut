@@ -31,7 +31,7 @@ function App() {
   }) {
     const hpValues = splitBlank(panel.hp, maxBlankHp, splitMode);
     const entries: PanelEntry[] = hpValues.map((hp) => ({
-      id: crypto.randomUUID(),
+      id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
       hp,
       format: panel.format,
       holeStyle: panel.holeStyle,
@@ -62,7 +62,7 @@ function App() {
     setPanels((prev) => {
       const source = prev.find((p) => p.id === id);
       if (!source) return prev;
-      const copy: PanelEntry = { ...source, id: crypto.randomUUID() };
+      const copy: PanelEntry = { ...source, id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) };
       const idx = prev.indexOf(source);
       return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
     });
@@ -84,7 +84,7 @@ function App() {
       const entries: PanelEntry[] = blanks.flatMap((b) => {
         const hpValues = splitBlank(b.hp, maxBlankHp, splitMode);
         return hpValues.map((hp) => ({
-          id: crypto.randomUUID(),
+          id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
           hp,
           format: b.format,
           holeStyle: "slot" as HoleStyle,
@@ -124,13 +124,13 @@ function App() {
   return (
     <div className="min-h-screen bg-background text-foreground font-mono">
       {/* Header */}
-      <header className="border-b border-border px-6 py-5">
+      <header className="border-b border-border px-4 py-4 sm:px-6 sm:py-5">
         <div className="max-w-5xl mx-auto flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <img src={faviconUrl} alt="rackcut logo" className="h-10 w-10" />
+            <img src={faviconUrl} alt="rackcut logo" className="h-8 w-8 sm:h-10 sm:w-10 shrink-0" />
             <div>
-              <h1 className="text-primary text-2xl font-bold tracking-tight">rackcut</h1>
-              <p className="text-muted-foreground text-sm">
+              <h1 className="text-primary text-xl sm:text-2xl font-bold tracking-tight">rackcut</h1>
+              <p className="text-muted-foreground text-xs sm:text-sm">
                 Generate laser-cut SVG files for Eurorack blank panels with generative engrave patterns.
               </p>
             </div>
@@ -138,10 +138,10 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-6 flex flex-col gap-8">
+      <main className="max-w-5xl mx-auto px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 sm:gap-8">
         {/* 1. Add Panels */}
         <section>
-          <div className="flex items-baseline gap-2 mb-3">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-3">
             <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">1. Add Panels</h2>
             <span className="text-muted-foreground/50 text-xs">Manually or import from ModularGrid</span>
           </div>
@@ -154,7 +154,7 @@ function App() {
 
         {/* 2. Configure */}
         <section>
-          <div className="flex items-baseline gap-2 mb-3">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-3">
             <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">2. Configure</h2>
             <span className="text-muted-foreground/50 text-xs">Sheet layout, auto-splitting, and default pattern for new panels</span>
           </div>
@@ -247,7 +247,7 @@ function App() {
 
         {/* 3. Your Panels */}
         <section>
-          <div className="flex items-baseline gap-2 mb-3">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-3">
             <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">3. Your Panels</h2>
             {panels.length > 0 ? (
               <span className="text-muted-foreground/50 text-xs">
@@ -271,23 +271,23 @@ function App() {
 
         {/* 4. Preview & Download */}
         <section>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">4. Preview & Download</h2>
+          <div className="flex flex-wrap items-start gap-x-3 gap-y-2 mb-3">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 flex-1 min-w-0">
+              <h2 className="text-primary text-sm font-semibold uppercase tracking-wider whitespace-nowrap">4. Preview & Download</h2>
               {panels.length > 0 && (
-                <span className="text-muted-foreground/50 text-xs">
+                <span className="text-muted-foreground/50 text-xs whitespace-nowrap">
                   {layoutResult.sheetWidth.toFixed(1)} x {layoutResult.sheetHeight.toFixed(1)} mm
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <div className="flex items-center gap-1.5">
-                <label htmlFor="material" className="text-xs text-muted-foreground/50">Material:</label>
+                <label htmlFor="material" className="text-xs text-muted-foreground/50 whitespace-nowrap">Material:</label>
                 <select
                   id="material"
                   value={material}
                   onChange={(e) => setMaterial(e.target.value as MaterialType)}
-                  className="h-7 rounded-sm border border-input bg-secondary px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="h-9 rounded-sm border border-input bg-secondary px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   title="Preview appearance only -- does not affect the downloaded SVG"
                 >
                   {Object.entries(MATERIAL_CONFIG).map(([value, config]) => (

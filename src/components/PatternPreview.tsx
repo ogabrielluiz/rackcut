@@ -30,10 +30,10 @@ export default function PatternPreview() {
   }
 
   return (
-    <div className="border border-border rounded-sm bg-card p-4">
-      <div className="flex items-center justify-between mb-4">
+    <div className="border border-border rounded-sm bg-card p-3 sm:p-4 w-full">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h3 className="text-primary font-semibold text-sm">Pattern Gallery — 20HP 3U Preview</h3>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <Button
             variant="ghost"
             size="sm"
@@ -47,7 +47,8 @@ export default function PatternPreview() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="max-h-[60vh] overflow-y-auto">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
         {patterns.map(({ key, label, svg }) => (
           <div key={key} className="flex flex-col gap-1">
             <div className="bg-[#0c0c0c] rounded-sm p-2 aspect-[101.3/128.5] flex items-center justify-center">
@@ -82,6 +83,7 @@ export default function PatternPreview() {
             <span className="text-xs text-muted-foreground text-center">{label}</span>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -210,7 +210,7 @@ export default function SvgPreview({
 
   if (placed.length === 0) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center border border-dashed border-border rounded-sm">
+      <div className="min-h-[300px] sm:min-h-[400px] flex items-center justify-center border border-dashed border-border rounded-sm">
         <p className="text-muted-foreground text-sm">
           Add panels to preview your cut sheet
         </p>
@@ -219,7 +219,7 @@ export default function SvgPreview({
   }
 
   return (
-    <div className="min-h-[400px] rounded-sm overflow-auto flex items-center justify-center p-6"
+    <div className="min-h-[300px] sm:min-h-[400px] rounded-sm overflow-auto flex items-center justify-center p-3 sm:p-6"
       style={{ backgroundColor: mat.bgColor }}
     >
       <svg
@@ -227,7 +227,7 @@ export default function SvgPreview({
         className="max-w-full"
         style={{
           aspectRatio: `${vw} / ${vh}`,
-          maxHeight: "70vh",
+          maxHeight: "80vh",
           width: "auto",
         }}
       >

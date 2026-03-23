@@ -27,6 +27,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm vitest run
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm exec playwright test
 
   deploy:
     needs: test
