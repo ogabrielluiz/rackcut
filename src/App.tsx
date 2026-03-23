@@ -313,10 +313,19 @@ function App() {
 
         {/* Footer */}
         <footer className="border-t border-border pt-4 pb-8 flex flex-col items-center gap-3">
+          <p className="text-muted-foreground/50 text-xs">
+            Made by{" "}
+            <a href="https://github.com/ogabrielluiz" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              ogabrielluiz
+            </a>
+            {" "}&middot;{" "}
+            <a href="https://github.com/ogabrielluiz/rackcut" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+              Source on GitHub
+            </a>
+          </p>
           <a href="https://www.buymeacoffee.com/ogabrielluiz" target="_blank" rel="noopener noreferrer">
             <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-[60px] w-[217px]" />
           </a>
-          <p className="text-muted-foreground/40 text-xs">rackcut is open source.</p>
         </footer>
       </main>
     </div>
