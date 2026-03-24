@@ -76,14 +76,34 @@ interface SvgPreviewProps {
   placed: PlacedPanel[];
   sheetWidth: number;
   sheetHeight: number;
-  material: MaterialType;
+  material?: MaterialType;
+  printColor?: string;
 }
 
-function PreviewPanel({ pp, index, material }: { pp: PlacedPanel; index: number; material: MaterialType }) {
+/** Generate a material config from a filament color */
+function printColorToMaterial(color: string): typeof MATERIAL_CONFIG[MaterialType] {
+  // Lighten the color for the pattern highlight
+  const r = parseInt(color.slice(1, 3), 16);
+  const g = parseInt(color.slice(3, 5), 16);
+  const b = parseInt(color.slice(5, 7), 16);
+  const highlight = `#${Math.min(255, r + 30).toString(16).padStart(2, "0")}${Math.min(255, g + 30).toString(16).padStart(2, "0")}${Math.min(255, b + 30).toString(16).padStart(2, "0")}`;
+  const isDark = (r + g + b) / 3 < 128;
+
+  return {
+    label: "3D Print",
+    panelFill: color,
+    engraveColor: highlight,
+    holeColor: isDark ? "#000000" : "#333333",
+    labelColor: isDark ? "#ffffff" : "#333333",
+    dimColor: isDark ? "#aaaaaa" : "#666666",
+    bgColor: isDark ? "#000000" : "#1a1a1a",
+  };
+}
+
+function PreviewPanel({ pp, index, mat }: { pp: PlacedPanel; index: number; mat: typeof MATERIAL_CONFIG[MaterialType] }) {
   const s = pp.spec;
-  const mat = MATERIAL_CONFIG[material];
   const clipId = `panel-clip-${index}`;
-  const isLaserView = material === "laser-svg";
+  const isLaserView = mat.label === "Laser SVG (red/blue)";
   const outlineColor = isLaserView ? "#FF0000" : mat.labelColor;
 
   return (
@@ -202,11 +222,12 @@ export default function SvgPreview({
   sheetWidth,
   sheetHeight,
   material,
+  printColor,
 }: SvgPreviewProps) {
   const margin = SVG_MARGIN;
   const vw = sheetWidth + 2 * margin;
   const vh = sheetHeight + 2 * margin;
-  const mat = MATERIAL_CONFIG[material];
+  const mat = printColor ? printColorToMaterial(printColor) : MATERIAL_CONFIG[material ?? "mdf"];
 
   if (placed.length === 0) {
     return (
@@ -241,7 +262,7 @@ export default function SvgPreview({
 
         <g transform={`translate(${margin},${margin})`}>
           {placed.map((pp, i) => (
-            <PreviewPanel key={i} pp={pp} index={i} material={material} />
+            <PreviewPanel key={i} pp={pp} index={i} mat={mat} />
           ))}
         </g>
 

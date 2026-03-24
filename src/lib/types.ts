@@ -2,6 +2,36 @@ export type Format = "3u" | "1u-intellijel" | "1u-pulplogic";
 
 export type HoleStyle = "slot" | "circle";
 
+export type SplitMode = "equal" | "fill-max";
+
+export type OutputMode = "laser-cut" | "3d-print";
+
+export type MaterialType = "mdf" | "black-acrylic" | "birch-plywood" | "aluminum" | "walnut" | "laser-svg";
+
+export type PatternType =
+  | "none"
+  | "concentric-circles"
+  | "hex-grid"
+  | "waveform"
+  | "sierpinski-full"
+  | "radial-burst"
+  | "flow-field"
+  | "circuit-traces"
+  | "binary-matrix"
+  | "oscilloscope"
+  | "flower-of-life"
+  | "metatrons-cube"
+  | "seed-of-life"
+  | "lissajous"
+  | "voronoi"
+  | "lorenz-attractor"
+  | "topographic"
+  | "phyllotaxis"
+  | "moire-lines"
+  | "chladni"
+  | "spirograph"
+  | "reaction-diffusion";
+
 export interface PanelSpec {
   width: number;
   height: number;
@@ -41,34 +71,6 @@ export interface RackRow {
 export interface RackData {
   rows: RackRow[];
 }
-
-export type SplitMode = "equal" | "fill-max";
-
-export type MaterialType = "mdf" | "black-acrylic" | "birch-plywood" | "aluminum" | "walnut" | "laser-svg";
-
-export type PatternType =
-  | "none"
-  | "concentric-circles"
-  | "hex-grid"
-  | "waveform"
-  | "sierpinski-full"
-  | "radial-burst"
-  | "flow-field"
-  | "circuit-traces"
-  | "binary-matrix"
-  | "oscilloscope"
-  | "flower-of-life"
-  | "metatrons-cube"
-  | "seed-of-life"
-  | "lissajous"
-  | "voronoi"
-  | "lorenz-attractor"
-  | "topographic"
-  | "phyllotaxis"
-  | "moire-lines"
-  | "chladni"
-  | "spirograph"
-  | "reaction-diffusion";
 
 export class PanelValidationError extends Error {
   constructor(message: string) {

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +11,12 @@ import { computePanel, layoutPanels, splitBlank } from "@/lib/panel";
 import { SORTED_PATTERN_ENTRIES } from "@/lib/patterns";
 import { generateSvg, downloadSvg } from "@/lib/svg";
 import { DEFAULT_GAP, MIN_GAP, MAX_GAP, DEFAULT_MAX_BLANK_HP } from "@/lib/constants";
-import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType, MaterialType } from "@/lib/types";
+import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType, MaterialType, OutputMode } from "@/lib/types";
 import { MATERIAL_CONFIG } from "@/components/SvgPreview";
+import StlDownloadDialog from "@/components/StlDownloadDialog";
+import StlViewer from "@/components/StlViewer";
+import { generatePanelStl } from "@/lib/renderers/stl-renderer";
+import { generatePatternGeometry } from "@/lib/pattern-geometry";
 import faviconUrl from "/favicon.svg?url";
 
 function App() {
@@ -22,6 +26,13 @@ function App() {
   const [splitMode, setSplitMode] = useState<SplitMode>("equal");
   const [globalPattern, setGlobalPattern] = useState<PatternType>("none");
   const [material, setMaterial] = useState<MaterialType>("mdf");
+  const [outputMode, setOutputMode] = useState<OutputMode>("laser-cut");
+  const [printColor, setPrintColor] = useState("#cccccc");
+  const [stlPreview, setStlPreview] = useState<ArrayBuffer | null>(null);
+  const [stlGenerating, setStlGenerating] = useState(false);
+  const [stlPreviewError, setStlPreviewError] = useState<string | null>(null);
+  const [previewPanelIndex, setPreviewPanelIndex] = useState(0);
+  const [previewTab, setPreviewTab] = useState<"2d" | "3d">("2d");
 
   function handleAdd(panel: {
     hp: number;
@@ -109,6 +120,42 @@ function App() {
     });
     return layoutPanels(inputs, gap);
   }, [panels, gap]);
+
+  // Clamp preview index when panels change
+  const clampedIndex = Math.min(previewPanelIndex, Math.max(0, layoutResult.placed.length - 1));
+  if (clampedIndex !== previewPanelIndex) setPreviewPanelIndex(clampedIndex);
+
+  // Auto-generate 3D preview for the selected panel when 3D tab is active
+  const previewPanel = layoutResult.placed[clampedIndex] ?? null;
+  const stlPreviewKey = previewTab === "3d" && previewPanel
+    ? `${clampedIndex}-${previewPanel.spec.hp}-${previewPanel.pattern}-${previewPanel.patternSeed}-${outputMode}`
+    : null;
+
+  useEffect(() => {
+    if (!stlPreviewKey || previewTab !== "3d" || !previewPanel) {
+      setStlPreview(null);
+      return;
+    }
+
+    let cancelled = false;
+    setStlPreview(null);
+    setStlGenerating(true);
+    setStlPreviewError(null);
+
+    // Delay to let React render the loading state before blocking the main thread
+    const timeout = setTimeout(() => {
+      const geo = generatePatternGeometry(previewPanel.pattern, previewPanel.spec.width, previewPanel.spec.height, previewPanel.patternSeed);
+      const engrave = outputMode === "laser-cut" ? "recess" as const : "extrude" as const;
+      generatePanelStl(previewPanel, 3, 0.5, geo, engrave)
+        .then((stl) => { if (!cancelled) setStlPreview(stl); })
+        .catch((e) => {
+          if (!cancelled) setStlPreviewError(e instanceof Error ? e.message : "3D preview failed");
+        })
+        .finally(() => { if (!cancelled) setStlGenerating(false); });
+    }, 50);
+
+    return () => { cancelled = true; clearTimeout(timeout); };
+  }, [stlPreviewKey, previewTab, previewPanel]);
 
   function handleDownload() {
     const svgString = generateSvg(
@@ -281,34 +328,174 @@ function App() {
               )}
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {/* Mode selector */}
               <div className="flex items-center gap-1.5">
-                <label htmlFor="material" className="text-xs text-muted-foreground/50">Material:</label>
+                <label className="text-xs text-muted-foreground/50">Mode:</label>
                 <select
-                  id="material"
-                  value={material}
-                  onChange={(e) => setMaterial(e.target.value as MaterialType)}
+                  value={outputMode}
+                  onChange={(e) => setOutputMode(e.target.value as OutputMode)}
                   className="h-9 rounded-sm border border-input bg-secondary px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  title="Preview appearance only -- does not affect the downloaded SVG"
                 >
-                  {Object.entries(MATERIAL_CONFIG).map(([value, config]) => (
-                    <option key={value} value={value}>{config.label}</option>
-                  ))}
+                  <option value="laser-cut">Laser Cut (SVG)</option>
+                  <option value="3d-print">3D Print (STL)</option>
                 </select>
               </div>
-              <span className="text-muted-foreground/40 text-xs hidden sm:inline">
-                <span className="text-[#FF6666]">red</span> = cut &middot; <span className="text-[#6666FF]">blue</span> = engrave
-              </span>
-              <Button onClick={handleDownload} disabled={panels.length === 0} className="w-full sm:w-auto">
-                Download SVG
-              </Button>
+
+              {/* Material or color picker based on mode */}
+              {outputMode === "laser-cut" ? (
+                <div className="flex items-center gap-1.5">
+                  <label htmlFor="material" className="text-xs text-muted-foreground/50">Material:</label>
+                  <select
+                    id="material"
+                    value={material}
+                    onChange={(e) => setMaterial(e.target.value as MaterialType)}
+                    className="h-9 rounded-sm border border-input bg-secondary px-2 text-xs text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    title="Preview appearance only"
+                  >
+                    {Object.entries(MATERIAL_CONFIG).map(([value, config]) => (
+                      <option key={value} value={value}>{config.label}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <label className="text-xs text-muted-foreground/50">Filament color:</label>
+                  {/* Preset swatches */}
+                  {["#f0f0f0", "#2a2a2a", "#808080", "#cc3333", "#3355cc", "#33aa55", "#dd7722"].map((c) => (
+                    <button
+                      key={c}
+                      className={`w-7 h-7 rounded-sm border ${printColor === c ? "border-primary ring-2 ring-primary/50" : "border-input"}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setPrintColor(c)}
+                      title={c}
+                    />
+                  ))}
+                  <input
+                    type="color"
+                    value={printColor}
+                    onChange={(e) => setPrintColor(e.target.value)}
+                    className="w-9 h-9 rounded-sm border border-input cursor-pointer"
+                    title="Custom filament color"
+                  />
+                </div>
+              )}
+
+              {/* Download buttons */}
+              {outputMode === "laser-cut" ? (
+                <>
+                  <span className="text-muted-foreground/40 text-xs hidden sm:inline">
+                    <span className="text-[#FF6666]">red</span> = cut &middot; <span className="text-[#6666FF]">blue</span> = engrave
+                  </span>
+                  <Button onClick={handleDownload} disabled={panels.length === 0} className="w-full sm:w-auto">
+                    Download SVG
+                  </Button>
+                </>
+              ) : (
+                <StlDownloadDialog
+                  panels={layoutResult.placed}
+                  disabled={panels.length === 0}
+                  engraveMode="extrude"
+                />
+              )}
             </div>
           </div>
-          <SvgPreview
-            placed={layoutResult.placed}
-            sheetWidth={layoutResult.sheetWidth}
-            sheetHeight={layoutResult.sheetHeight}
-            material={material}
-          />
+          {/* Preview tabs */}
+          <div className="flex items-center gap-1 mb-2">
+            <button
+              onClick={() => setPreviewTab("2d")}
+              className={`px-3 py-1.5 text-xs font-mono rounded-t-sm border border-b-0 transition-colors ${
+                previewTab === "2d"
+                  ? "bg-card border-border text-primary"
+                  : "bg-transparent border-transparent text-muted-foreground/50 hover:text-muted-foreground"
+              }`}
+            >
+              2D Sheet
+            </button>
+            <button
+              onClick={() => setPreviewTab("3d")}
+              className={`px-3 py-1.5 text-xs font-mono rounded-t-sm border border-b-0 transition-colors ${
+                previewTab === "3d"
+                  ? "bg-card border-border text-primary"
+                  : "bg-transparent border-transparent text-muted-foreground/50 hover:text-muted-foreground"
+              }`}
+            >
+              3D Panel
+            </button>
+
+            {/* 3D panel navigator — shown when on 3D tab with panels */}
+            {previewTab === "3d" && panels.length > 0 && (
+              <div className="flex items-center gap-1 ml-4">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={clampedIndex === 0 || stlGenerating}
+                  onClick={() => setPreviewPanelIndex(clampedIndex - 1)}
+                >
+                  &larr;
+                </Button>
+                <span className="text-xs text-muted-foreground min-w-[80px] text-center">
+                  {stlGenerating ? (
+                    <span className="animate-pulse">Loading...</span>
+                  ) : (
+                    `Panel ${clampedIndex + 1} / ${layoutResult.placed.length}`
+                  )}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  disabled={clampedIndex >= layoutResult.placed.length - 1 || stlGenerating}
+                  onClick={() => setPreviewPanelIndex(clampedIndex + 1)}
+                >
+                  &rarr;
+                </Button>
+              </div>
+            )}
+
+            {previewTab === "3d" && (
+              <span className="text-[10px] text-muted-foreground/40 ml-auto">
+                Drag to rotate, scroll to zoom
+              </span>
+            )}
+          </div>
+
+          {/* 2D Sheet tab */}
+          {previewTab === "2d" && (
+            <SvgPreview
+              placed={layoutResult.placed}
+              sheetWidth={layoutResult.sheetWidth}
+              sheetHeight={layoutResult.sheetHeight}
+              material={outputMode === "laser-cut" ? material : undefined}
+              printColor={outputMode === "3d-print" ? printColor : undefined}
+            />
+          )}
+
+          {/* 3D Panel tab */}
+          {previewTab === "3d" && (
+            <>
+              {panels.length === 0 && (
+                <div className="min-h-[400px] flex items-center justify-center border border-dashed border-border rounded-sm">
+                  <p className="text-muted-foreground text-sm">Add panels to preview in 3D</p>
+                </div>
+              )}
+              {panels.length > 0 && stlPreviewError && (
+                <div className="w-full h-[200px] rounded-sm border border-destructive/50 flex items-center justify-center bg-[#1a1917]">
+                  <p className="text-destructive text-sm">{stlPreviewError}</p>
+                </div>
+              )}
+              {panels.length > 0 && stlGenerating && !stlPreview && !stlPreviewError && (
+                <div className="w-full h-[500px] rounded-sm border border-border flex items-center justify-center bg-[#1a1917]">
+                  <p className="text-muted-foreground text-sm animate-pulse">Generating 3D model...</p>
+                </div>
+              )}
+              {panels.length > 0 && stlPreview && (
+                <StlViewer
+                  stlData={stlPreview}
+                  color={outputMode === "3d-print" ? printColor : MATERIAL_CONFIG[material]?.panelFill ?? "#c0c0c0"}
+                  className="w-full h-[500px] rounded-sm border border-border overflow-hidden"
+                />
+              )}
+            </>
+          )}
         </section>
 
         {/* Footer */}
