@@ -185,6 +185,13 @@ function App() {
         </div>
       </header>
 
+      {/* Notice banner */}
+      <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 sm:px-6">
+        <p className="max-w-5xl mx-auto text-xs text-primary/80">
+          <span className="font-semibold">New:</span> 3D Print mode is here! Export STL files with raised patterns, preview in 3D, and pick your filament color.
+        </p>
+      </div>
+
       <main className="max-w-5xl mx-auto px-4 py-4 sm:px-6 sm:py-6 flex flex-col gap-6 sm:gap-8">
         {/* 1. Add Panels */}
         <section>
