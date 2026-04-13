@@ -61,6 +61,10 @@ pnpm exec wrangler dev    # Local dev
 pnpm exec wrangler deploy # Deploy to Cloudflare
 ```
 
+## Related projects
+
+- [**Voltpages**](https://ogabrielluiz.github.io/voltpages/) — quick-reference cheat sheets for eurorack modules (controls, I/O, behaviors, patch ideas).
+
 ## License
 
 MIT
