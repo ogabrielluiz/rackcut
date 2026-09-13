@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { generatePanelStl, generateAllPanelsStlZip } from "./stl-renderer";
+import { computePanel } from "../panel";
 import { generatePatternGeometry } from "../pattern-geometry";
 import { emptyGeometry } from "../pattern-geometry/types";
 import type { PlacedPanel, PatternType } from "../types";
@@ -359,6 +360,18 @@ describe("edge cases", () => {
     const stl = await generatePanelStl(panel, 3, 0, emptyGeometry());
     expect(isValidStl(stl)).toBe(true);
   });
+
+  for (const hp of [1, 2, 3]) {
+    for (const style of ["slot", "circle"] as const) {
+      it(`handles a real ${hp}HP ${style} spec from computePanel`, async () => {
+        const panel = makePanel({ spec: computePanel(hp, "3u", style), label: `${hp}HP 3U` });
+        const stl = await generatePanelStl(panel, 3, 0, emptyGeometry());
+        expect(isValidStl(stl)).toBe(true);
+        // The holes must actually be subtracted, so the body is more than a box.
+        expect(getTriCount(stl)).toBeGreaterThan(12);
+      });
+    }
+  }
 
   it("handles 1U panel (short)", async () => {
     const panel = makePanel({
