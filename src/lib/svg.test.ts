@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { generateSvg, downloadSvg } from "./svg";
+import { computePanel, layoutPanels } from "./panel";
 import type { PlacedPanel } from "./types";
 import type { Format, HoleStyle } from "./types";
 
@@ -451,6 +452,53 @@ describe("generateSvg", () => {
 // ---------------------------------------------------------------------------
 // downloadSvg tests
 // ---------------------------------------------------------------------------
+
+describe("narrow panels", () => {
+  /** Every hole element the SVG draws, as a center-x / half-width pair. */
+  function holeExtents(svg: string): { cx: number; half: number }[] {
+    const extents: { cx: number; half: number }[] = [];
+
+    for (const m of svg.matchAll(/<circle cx="([\d.]+)" cy="[\d.]+" r="([\d.]+)"/g)) {
+      extents.push({ cx: Number(m[1]), half: Number(m[2]) });
+    }
+    // Slots are rects; skip the panel outline, which always starts at x="0".
+    for (const m of svg.matchAll(/<rect x="([\d.-]+)" y="[\d.-]+" width="([\d.]+)"[^>]*rx="([\d.]+)"/g)) {
+      const x = Number(m[1]);
+      const w = Number(m[2]);
+      if (x === 0) continue;
+      extents.push({ cx: x + w / 2, half: w / 2 });
+    }
+    return extents;
+  }
+
+  for (let hp = 1; hp <= 6; hp++) {
+    for (const style of ["slot", "circle"] as const) {
+      it(`${hp}HP ${style} — no hole is drawn outside the panel outline`, () => {
+        const spec = computePanel(hp, "3u", style);
+        const { placed, sheetWidth, sheetHeight } = layoutPanels([spec], 2);
+        const svg = generateSvg(placed, sheetWidth, sheetHeight, 0);
+
+        const extents = holeExtents(svg);
+        expect(extents.length).toBeGreaterThan(0);
+
+        for (const { cx, half } of extents) {
+          expect(cx - half).toBeGreaterThan(0);
+          expect(cx + half).toBeLessThan(spec.width);
+        }
+      });
+    }
+  }
+
+  it("1HP draws round holes, not slots", () => {
+    const spec = computePanel(1, "3u", "slot");
+    const { placed, sheetWidth, sheetHeight } = layoutPanels([spec], 2);
+    const svg = generateSvg(placed, sheetWidth, sheetHeight, 0);
+
+    expect(svg).toContain("<circle");
+    // The only rect left is the panel outline.
+    expect(svg.match(/<rect/g)).toHaveLength(1);
+  });
+});
 
 describe("downloadSvg", () => {
   afterEach(() => {

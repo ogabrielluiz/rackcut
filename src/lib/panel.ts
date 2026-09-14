@@ -2,6 +2,9 @@ import {
   HP_MM,
   PANEL_WIDTH_CLEARANCE,
   HOLE_EDGE_OFFSET_H,
+  HOLE_DIAMETER,
+  SLOT_WIDTH,
+  MIN_HOLE_EDGE_MARGIN,
   FOUR_HOLE_THRESHOLD_HP,
   FORMAT_PARAMS,
   MIN_HP,
@@ -9,6 +12,54 @@ import {
 } from "./constants";
 import type { Format, HoleStyle, PanelSpec, PlacedPanel } from "./types";
 import { PanelValidationError } from "./types";
+
+// ---------------------------------------------------------------------------
+// Hole placement
+// ---------------------------------------------------------------------------
+
+/** Panel width in mm for a given HP, including the fit clearance. */
+export function panelWidth(hp: number): number {
+  return hp * HP_MM - PANEL_WIDTH_CLEARANCE;
+}
+
+/** How far a mounting feature reaches horizontally from its own center. */
+function holeHalfWidth(style: HoleStyle): number {
+  return style === "circle" ? HOLE_DIAMETER / 2 : SLOT_WIDTH / 2;
+}
+
+/**
+ * Pick the leftmost mounting-hole X for a panel.
+ *
+ * The standard offset is HOLE_EDGE_OFFSET_H from the left edge, but that sits
+ * off the panel entirely on a 1HP blank (7.5mm offset, 4.78mm of panel). Moving
+ * the hole left by a whole number of HP lands it on the same rack thread grid,
+ * so the panel still bolts up — it just uses the previous rail position.
+ *
+ * Returns null when no grid position leaves MIN_HOLE_EDGE_MARGIN of material on
+ * both sides, i.e. the feature is simply too wide for the panel.
+ */
+function gridAlignedLeftX(width: number, style: HoleStyle): number | null {
+  const halfWidth = holeHalfWidth(style);
+  const minX = halfWidth + MIN_HOLE_EDGE_MARGIN;
+  const maxX = width - halfWidth - MIN_HOLE_EDGE_MARGIN;
+
+  for (let x = HOLE_EDGE_OFFSET_H; x >= minX; x -= HP_MM) {
+    if (x <= maxX) return x;
+  }
+  return null;
+}
+
+/**
+ * The hole style a panel can actually be cut with.
+ *
+ * A slot is 4mm wide, which leaves no usable material on the narrowest panels,
+ * so those fall back to a round hole. Everything downstream reads the style off
+ * the returned PanelSpec, so preview, SVG and STL all agree.
+ */
+export function resolveHoleStyle(hp: number, requested: HoleStyle): HoleStyle {
+  if (requested === "circle") return "circle";
+  return gridAlignedLeftX(panelWidth(hp), "slot") !== null ? "slot" : "circle";
+}
 
 // ---------------------------------------------------------------------------
 // computePanel
@@ -33,11 +84,14 @@ export function computePanel(
 
   const { height, holeEdgeV } = FORMAT_PARAMS[format];
 
-  const width = hp * HP_MM - PANEL_WIDTH_CLEARANCE;
+  const width = panelWidth(hp);
+  const effectiveHoleStyle = resolveHoleStyle(hp, holeStyle);
 
-  // Horizontal hole positions
-  const leftX = HOLE_EDGE_OFFSET_H;
-  const rawRightX = HOLE_EDGE_OFFSET_H + (hp - 3) * HP_MM;
+  // Horizontal hole positions. Fall back to horizontally centered if even a
+  // round hole has no grid position that fits — unreachable for HP >= MIN_HP,
+  // but better than emitting a hole off the edge of the panel.
+  const leftX = gridAlignedLeftX(width, effectiveHoleStyle) ?? width / 2;
+  const rawRightX = leftX + (hp - 3) * HP_MM;
   // Collapse rightX to leftX when the panel is too narrow
   const rightX = rawRightX > leftX ? rawRightX : leftX;
 
@@ -63,7 +117,7 @@ export function computePanel(
     ];
   }
 
-  return { width, height, hp, format, holes, holeStyle };
+  return { width, height, hp, format, holes, holeStyle: effectiveHoleStyle };
 }
 
 // ---------------------------------------------------------------------------

@@ -14,6 +14,9 @@ export const SLOT_HEIGHT = 3.2;
 export const HOLE_EDGE_OFFSET_H = 7.5;
 export const HOLE_EDGE_OFFSET_V = 3.0;
 
+// Minimum material left between a mounting hole and the panel edge.
+export const MIN_HOLE_EDGE_MARGIN = 0.6;
+
 export const FOUR_HOLE_THRESHOLD_HP = 10;
 
 export const CUT_COLOR = "#FF0000";

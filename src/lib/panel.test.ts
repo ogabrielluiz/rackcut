@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computePanel, layoutPanels, splitBlank } from "./panel";
+import { computePanel, layoutPanels, panelWidth, resolveHoleStyle, splitBlank } from "./panel";
 import {
   HP_MM,
   PANEL_WIDTH_CLEARANCE,
@@ -8,6 +8,9 @@ import {
   PANEL_HEIGHT_1U_PULPLOGIC,
   HOLE_EDGE_OFFSET_H,
   HOLE_EDGE_OFFSET_V,
+  HOLE_DIAMETER,
+  SLOT_WIDTH,
+  MIN_HOLE_EDGE_MARGIN,
   FOUR_HOLE_THRESHOLD_HP,
 } from "./constants";
 import { PanelValidationError } from "./types";
@@ -153,9 +156,80 @@ describe("computePanel", () => {
     it("1HP panel has 2 holes at the same X (collapsed)", () => {
       const panel = computePanel(1, "3u", "circle");
       // rightX would be <= leftX, so both holes share leftX
-      const leftX = HOLE_EDGE_OFFSET_H;
       expect(panel.holes).toHaveLength(2);
-      expect(panel.holes.every(([x]) => Math.abs(x - leftX) < 1e-6)).toBe(true);
+      const [firstX] = panel.holes[0];
+      expect(panel.holes.every(([x]) => Math.abs(x - firstX) < 1e-6)).toBe(true);
+    });
+  });
+
+  // Narrow panels — holes must stay on the panel ------------------------
+
+  describe("narrow panels keep holes inside the panel", () => {
+    const halfWidth = (style: "slot" | "circle") =>
+      style === "circle" ? HOLE_DIAMETER / 2 : SLOT_WIDTH / 2;
+
+    for (const style of ["slot", "circle"] as const) {
+      for (let hp = 1; hp <= 12; hp++) {
+        it(`${hp}HP ${style} — every hole fits within the panel width`, () => {
+          const panel = computePanel(hp, "3u", style);
+          const half = halfWidth(panel.holeStyle);
+
+          for (const [x] of panel.holes) {
+            expect(x - half).toBeGreaterThanOrEqual(MIN_HOLE_EDGE_MARGIN - 1e-6);
+            expect(panel.width - (x + half)).toBeGreaterThanOrEqual(
+              MIN_HOLE_EDGE_MARGIN - 1e-6
+            );
+          }
+        });
+      }
+    }
+
+    it("1HP holes are not placed at the standard 7.5mm offset (off the panel)", () => {
+      const panel = computePanel(1, "3u", "circle");
+      expect(panel.width).toBeLessThan(HOLE_EDGE_OFFSET_H);
+      expect(panel.holes.every(([x]) => x < panel.width)).toBe(true);
+    });
+
+    it("1HP holes stay on the rack thread grid (a whole HP left of the standard offset)", () => {
+      const panel = computePanel(1, "3u", "circle");
+      const offGrid = panel.holes.map(
+        ([x]) => Math.abs((HOLE_EDGE_OFFSET_H - x) % HP_MM)
+      );
+      for (const delta of offGrid) {
+        expect(Math.min(delta, HP_MM - delta)).toBeLessThan(1e-6);
+      }
+    });
+
+    it("panels 3HP and wider keep the standard 7.5mm offset", () => {
+      for (let hp = 3; hp <= 12; hp++) {
+        const panel = computePanel(hp, "3u", "circle");
+        expect(panel.holes.some(([x]) => Math.abs(x - HOLE_EDGE_OFFSET_H) < 1e-6)).toBe(
+          true
+        );
+      }
+    });
+  });
+
+  // Hole style fallback on narrow panels --------------------------------
+
+  describe("hole style fallback", () => {
+    it("1HP falls back to a circle when a slot is requested", () => {
+      expect(computePanel(1, "3u", "slot").holeStyle).toBe("circle");
+    });
+
+    it("2HP falls back to a circle when a slot is requested", () => {
+      // A 4mm slot would leave 0.36mm of material at the panel edge.
+      expect(computePanel(2, "3u", "slot").holeStyle).toBe("circle");
+    });
+
+    it("3HP keeps the requested slot", () => {
+      expect(computePanel(3, "3u", "slot").holeStyle).toBe("slot");
+    });
+
+    it("a requested circle is never changed", () => {
+      for (let hp = 1; hp <= 12; hp++) {
+        expect(computePanel(hp, "3u", "circle").holeStyle).toBe("circle");
+      }
     });
   });
 
@@ -190,6 +264,44 @@ describe("computePanel", () => {
     it("does not throw for HP=128 (boundary)", () => {
       expect(() => computePanel(128, "3u", "circle")).not.toThrow();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// panelWidth / resolveHoleStyle
+// ---------------------------------------------------------------------------
+
+describe("panelWidth", () => {
+  it("matches the width computePanel produces", () => {
+    for (const hp of [1, 2, 3, 8, 128]) {
+      expect(panelWidth(hp)).toBeCloseTo(computePanel(hp, "3u", "circle").width, 5);
+    }
+  });
+});
+
+describe("resolveHoleStyle", () => {
+  it("downgrades a slot to a circle on 1HP and 2HP", () => {
+    expect(resolveHoleStyle(1, "slot")).toBe("circle");
+    expect(resolveHoleStyle(2, "slot")).toBe("circle");
+  });
+
+  it("leaves a slot alone from 3HP up", () => {
+    expect(resolveHoleStyle(3, "slot")).toBe("slot");
+    expect(resolveHoleStyle(8, "slot")).toBe("slot");
+  });
+
+  it("leaves a circle alone at every HP", () => {
+    for (let hp = 1; hp <= 12; hp++) {
+      expect(resolveHoleStyle(hp, "circle")).toBe("circle");
+    }
+  });
+
+  it("agrees with the style computePanel returns", () => {
+    for (let hp = 1; hp <= 12; hp++) {
+      for (const style of ["slot", "circle"] as const) {
+        expect(resolveHoleStyle(hp, style)).toBe(computePanel(hp, "3u", style).holeStyle);
+      }
+    }
   });
 });
 

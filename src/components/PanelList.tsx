@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import type { Format, HoleStyle, PanelEntry, PatternType } from '@/lib/types'
 import { SORTED_PATTERN_ENTRIES } from '@/lib/patterns'
 import { MIN_HP, MAX_HP } from '@/lib/constants'
+import { resolveHoleStyle } from '@/lib/panel'
 
 const FORMAT_OPTIONS: { value: Format; label: string }[] = [
   { value: '3u', label: '3U' },
@@ -33,6 +34,8 @@ export default function PanelList({
       {panels.map((panel) => {
         const formatLabel = FORMAT_OPTIONS.find(f => f.value === panel.format)?.label ?? panel.format;
         const panelLabel = `${panel.hp}HP ${formatLabel}`
+        // A slot is too wide for the narrowest panels; those get a round hole.
+        const holesDowngraded = resolveHoleStyle(panel.hp, panel.holeStyle) !== panel.holeStyle
 
         return (
           <div
@@ -93,6 +96,14 @@ export default function PanelList({
                   <option value="slot">Slot</option>
                   <option value="circle">Circle</option>
                 </select>
+                {holesDowngraded && (
+                  <span
+                    className="text-[10px] text-muted-foreground/70"
+                    title={`A slot is too wide for a ${panel.hp}HP panel — using a round hole instead.`}
+                  >
+                    → round
+                  </span>
+                )}
               </div>
 
               <div className="flex items-center gap-1">
