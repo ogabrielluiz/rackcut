@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import PanelList from './PanelList'
@@ -129,5 +129,25 @@ describe('PanelList', () => {
     expect(seedInputs).toHaveLength(2)
     expect(seedInputs[0]).toHaveValue(42)
     expect(seedInputs[1]).toHaveValue(99)
+  })
+
+  it('groups the pattern choices by kind', () => {
+    renderList()
+    const select = screen.getAllByLabelText(/^Pattern for /i)[0]
+    expect(within(select).getAllByRole('group').map((g) => g.getAttribute('label'))).toEqual([
+      'Line art',
+      'Relief (3D print)',
+      'Two-tone bands (3D print)',
+    ])
+    // None, 21 line patterns, 8 fields in each of two surface styles
+    expect(within(select).getAllByRole('option')).toHaveLength(1 + 21 + 16)
+    expect(within(select).getAllByRole('option')[0]).toHaveValue('none')
+  })
+
+  it('selects a surface pattern like any other', async () => {
+    const user = userEvent.setup()
+    renderList()
+    await user.selectOptions(screen.getAllByLabelText(/^Pattern for /i)[0], 'bands-cells')
+    expect(onUpdatePanel).toHaveBeenCalledWith('1', { pattern: 'bands-cells' })
   })
 })

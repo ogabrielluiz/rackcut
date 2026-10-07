@@ -8,7 +8,8 @@ export type OutputMode = "laser-cut" | "3d-print";
 
 export type MaterialType = "mdf" | "black-acrylic" | "birch-plywood" | "aluminum" | "walnut" | "laser-svg";
 
-export type PatternType =
+/** Patterns drawn as lines: engraved by a laser, or raised as lines on a print */
+export type LinePatternType =
   | "none"
   | "concentric-circles"
   | "hex-grid"
@@ -31,6 +32,24 @@ export type PatternType =
   | "chladni"
   | "spirograph"
   | "reaction-diffusion";
+
+/** Scalar fields over the panel that surface patterns are made from */
+export type SurfaceField =
+  | "damascus"
+  | "marble"
+  | "topo"
+  | "chladni-plate"
+  | "interference"
+  | "cells"
+  | "labyrinth"
+  | "ripple";
+
+export type SurfaceStyle = "relief" | "bands";
+
+/** A height-field pattern: one field rendered in one style. */
+export type SurfacePattern = `${SurfaceStyle}-${SurfaceField}`;
+
+export type PatternType = LinePatternType | SurfacePattern;
 
 export interface PanelSpec {
   width: number;

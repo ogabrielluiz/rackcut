@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { generatePatternGeometry, PATTERN_LABELS, SORTED_PATTERN_ENTRIES } from "./index";
+import {
+  generatePatternGeometry,
+  PATTERN_GROUPS,
+  PATTERN_LABELS,
+  SORTED_PATTERN_ENTRIES,
+  surfacePatternEntries,
+} from "./index";
+import { isSurfacePattern } from "../surfaces/fields";
+import { computePanel } from "../panel";
 import type { PatternType } from "../types";
 
 // Panel dimensions typical for a 3U eurorack panel (e.g. 8HP)
@@ -232,5 +240,76 @@ describe("SORTED_PATTERN_ENTRIES", () => {
     for (let i = 0; i < rest.length - 1; i++) {
       expect(rest[i][1].localeCompare(rest[i + 1][1])).toBeLessThanOrEqual(0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Surface patterns: engraved as the outlines of their bands
+// ---------------------------------------------------------------------------
+
+describe("surface patterns as line art", () => {
+  const surfaces = [...surfacePatternEntries("relief"), ...surfacePatternEntries("bands")].map(([key]) => key);
+
+  it("covers every field in both styles", () => {
+    expect(surfaces).toHaveLength(16);
+    expect(new Set(surfaces).size).toBe(16);
+    expect(surfaces.every(isSurfacePattern)).toBe(true);
+  });
+
+  for (const pattern of surfaces) {
+    it(`${pattern} traces outlines that stay on the panel, down to 2HP`, () => {
+      for (const hp of [2, 8]) {
+        const { width, height } = computePanel(hp, "3u", "slot");
+        const geo = generatePatternGeometry(pattern, width, height, 42);
+        expect(geo.paths.length, `${hp}HP`).toBeGreaterThan(3);
+        expect(geo.lines.length + geo.circles.length + geo.polygons.length + geo.rects.length + geo.texts.length).toBe(0);
+        for (const path of geo.paths) {
+          expect(path.points.length).toBeGreaterThanOrEqual(2);
+          for (const [x, y] of path.points) {
+            expect(x).toBeGreaterThanOrEqual(-1e-9);
+            expect(x).toBeLessThanOrEqual(width + 1e-9);
+            expect(y).toBeGreaterThanOrEqual(-1e-9);
+            expect(y).toBeLessThanOrEqual(height + 1e-9);
+          }
+        }
+      }
+    });
+  }
+
+  it("is reproducible from the seed", () => {
+    const a = generatePatternGeometry("bands-cells", W, H, 5);
+    expect(generatePatternGeometry("bands-cells", W, H, 5)).toEqual(a);
+    expect(generatePatternGeometry("bands-cells", W, H, 6)).not.toEqual(a);
+  });
+
+  it("renders nothing for values outside PatternType", () => {
+    const empty = generatePatternGeometry("none", W, H, 1);
+    expect(generatePatternGeometry("relief-nope" as PatternType, W, H, 1)).toEqual(empty);
+    expect(generatePatternGeometry(undefined as unknown as PatternType, W, H, 1)).toEqual(empty);
+  });
+});
+
+describe("PATTERN_GROUPS", () => {
+  it("lists line art, then relief, then two-tone bands", () => {
+    expect(PATTERN_GROUPS.map((g) => g.label)).toEqual([
+      "Line art",
+      "Relief (3D print)",
+      "Two-tone bands (3D print)",
+    ]);
+    expect(PATTERN_GROUPS.map((g) => g.entries.length)).toEqual([21, 8, 8]);
+  });
+
+  it("holds every pattern except none exactly once", () => {
+    const keys = PATTERN_GROUPS.flatMap((g) => g.entries.map(([key]) => key));
+    expect(keys).not.toContain("none");
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toEqual(expect.arrayContaining(ALL_PATTERNS));
+  });
+
+  it("names the style in each surface label, so a closed select is unambiguous", () => {
+    const labels = PATTERN_GROUPS.flatMap((g) => g.entries.map(([, label]) => label));
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).toContain("Damascus (relief)");
+    expect(labels).toContain("Damascus (bands)");
   });
 });

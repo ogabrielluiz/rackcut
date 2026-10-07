@@ -1,8 +1,9 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { generatePanelStl, generateAllPanelsStlZip } from "./stl-renderer";
+import { isWatertight, readTriangles } from "./stl-test-utils";
 import { computePanel } from "../panel";
-import { generatePatternGeometry } from "../pattern-geometry";
+import { generatePatternGeometry, SORTED_PATTERN_ENTRIES } from "../pattern-geometry";
 import { emptyGeometry } from "../pattern-geometry/types";
 import type { PlacedPanel, PatternType } from "../types";
 
@@ -512,4 +513,22 @@ describe("pattern quality", () => {
     expect(isValidStl(stl)).toBe(true);
     expect(getTriCount(stl)).toBeGreaterThan(12);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Printable output: a slicer needs one closed, consistently wound surface
+// ---------------------------------------------------------------------------
+
+describe("closed solids", () => {
+  const patterns = SORTED_PATTERN_ENTRIES.map(([key]) => key as PatternType).filter((key) => key !== "none");
+
+  // Raised is the mode that gets exported; recessed is only the on-screen laser preview
+  for (const pattern of patterns) {
+    it(`${pattern} exports a watertight mesh`, async () => {
+      const spec = computePanel(4, "3u", "slot");
+      const geometry = generatePatternGeometry(pattern, spec.width, spec.height, 42);
+      const stl = await generatePanelStl(makePanel({ spec, pattern, patternSeed: 42 }), 3, 0.6, geometry);
+      expect(isWatertight(readTriangles(stl))).toBe(true);
+    });
+  }
 });

@@ -5,6 +5,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 interface StlViewerProps {
   stlData: ArrayBuffer | null;
   color: string;
+  /** Second filament colour, applied to everything printed above `accentAboveZ` */
+  accentColor?: string;
+  /** Height of the filament change, in mm */
+  accentAboveZ?: number;
   className?: string;
 }
 
@@ -39,7 +43,24 @@ function parseStlToGeometry(buffer: ArrayBuffer): THREE.BufferGeometry {
   return geometry;
 }
 
-export default function StlViewer({ stlData, color, className }: StlViewerProps) {
+/**
+ * Colour each triangle by filament: faces lying on or below the change height
+ * keep the base colour, everything above it takes the accent.
+ */
+function applyFilamentColors(geometry: THREE.BufferGeometry, base: string, accent: string, aboveZ: number) {
+  const positions = geometry.getAttribute("position");
+  const colors = new Float32Array(positions.count * 3);
+  const baseColor = new THREE.Color(base);
+  const accentColor = new THREE.Color(accent);
+  for (let v = 0; v < positions.count; v += 3) {
+    const centroidZ = (positions.getZ(v) + positions.getZ(v + 1) + positions.getZ(v + 2)) / 3;
+    const c = centroidZ > aboveZ + 1e-3 ? accentColor : baseColor;
+    for (let k = 0; k < 3; k++) c.toArray(colors, (v + k) * 3);
+  }
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+}
+
+export default function StlViewer({ stlData, color, accentColor, accentAboveZ, className }: StlViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<{
     renderer: THREE.WebGLRenderer;
@@ -139,8 +160,11 @@ export default function StlViewer({ stlData, color, className }: StlViewerProps)
     }
 
     const geometry = parseStlToGeometry(stlData);
+    const twoTone = accentColor !== undefined && accentAboveZ !== undefined;
+    if (twoTone) applyFilamentColors(geometry, color, accentColor, accentAboveZ);
     const material = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(color),
+      color: twoTone ? 0xffffff : new THREE.Color(color),
+      vertexColors: twoTone,
       specular: 0x444444,
       shininess: 30,
       flatShading: false,
@@ -161,7 +185,7 @@ export default function StlViewer({ stlData, color, className }: StlViewerProps)
     s.camera.position.set(center.x, center.y - maxDim * 0.8, center.z + maxDim * 1.2);
     s.controls.target.copy(center);
     s.controls.update();
-  }, [stlData, color]);
+  }, [stlData, color, accentColor, accentAboveZ]);
 
   return (
     <div

@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button'
 import type { Format, HoleStyle, PanelEntry, PatternType } from '@/lib/types'
-import { SORTED_PATTERN_ENTRIES } from '@/lib/patterns'
-import { MIN_HP, MAX_HP } from '@/lib/constants'
+import PatternOptions from '@/components/PatternOptions'
+import { MIN_HP, MAX_HP, MAX_QUANTITY } from '@/lib/constants'
 import { resolveHoleStyle } from '@/lib/panel'
 
 const FORMAT_OPTIONS: { value: Format; label: string }[] = [
@@ -122,7 +122,7 @@ export default function PanelList({
                     variant="ghost"
                     size="icon-sm"
                     aria-label={`Increase quantity of ${panelLabel}`}
-                    onClick={() => onUpdatePanel(panel.id, { quantity: Math.min(100, panel.quantity + 1) })}
+                    onClick={() => onUpdatePanel(panel.id, { quantity: Math.min(MAX_QUANTITY, panel.quantity + 1) })}
                   >
                     +
                   </Button>
@@ -169,9 +169,7 @@ export default function PanelList({
                 className={`h-9 px-1.5 text-xs text-muted-foreground ${selectBase}`}
                 aria-label={`Pattern for ${panelLabel}`}
               >
-                {SORTED_PATTERN_ENTRIES.map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
+                <PatternOptions />
               </select>
 
               <Button

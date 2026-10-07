@@ -13,6 +13,11 @@ import {
 import type { Format, HoleStyle, PanelSpec, PlacedPanel } from "./types";
 import { PanelValidationError } from "./types";
 
+/** A unique id for a panel in the list */
+export function newPanelId(): string {
+  return crypto.randomUUID?.() ?? Math.random().toString(36).slice(2);
+}
+
 // ---------------------------------------------------------------------------
 // Hole placement
 // ---------------------------------------------------------------------------

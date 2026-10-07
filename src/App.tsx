@@ -7,27 +7,49 @@ import PanelList from "@/components/PanelList";
 import SvgPreview from "@/components/SvgPreview";
 import ModularGridDialog from "@/components/ModularGridDialog";
 import PatternPreview from "@/components/PatternPreview";
-import { computePanel, layoutPanels, splitBlank } from "@/lib/panel";
-import { SORTED_PATTERN_ENTRIES } from "@/lib/patterns";
+import { computePanel, layoutPanels, newPanelId, splitBlank } from "@/lib/panel";
+import PatternOptions from "@/components/PatternOptions";
 import { generateSvg, downloadSvg } from "@/lib/svg";
-import { DEFAULT_GAP, MIN_GAP, MAX_GAP, DEFAULT_MAX_BLANK_HP } from "@/lib/constants";
+import {
+  MIN_GAP,
+  MAX_GAP,
+  DEFAULT_PRINT_THICKNESS,
+  DEFAULT_PATTERN_HEIGHT,
+  DEFAULT_RELIEF_HEIGHT,
+} from "@/lib/constants";
+import { loadWorkspace, saveWorkspace } from "@/lib/workspace-storage";
 import type { PanelEntry, Format, HoleStyle, SplitMode, PatternType, MaterialType, OutputMode } from "@/lib/types";
 import { MATERIAL_CONFIG } from "@/components/SvgPreview";
 import StlDownloadDialog from "@/components/StlDownloadDialog";
 import StlViewer from "@/components/StlViewer";
 import { generatePanelStl } from "@/lib/renderers/stl-renderer";
+import { generateSurfacePanelStl } from "@/lib/renderers/surface-stl-renderer";
+import { parseSurfacePattern } from "@/lib/surfaces/fields";
 import { generatePatternGeometry } from "@/lib/pattern-geometry";
 import faviconUrl from "/favicon.svg?url";
 
+/** Sheet thickness the 3D preview of a laser-cut panel is drawn at: common 3 mm stock (mm) */
+const LASER_PREVIEW_SHEET_THICKNESS = 3;
+/** Depth the engraving is drawn at in that preview (mm) */
+const LASER_PREVIEW_ENGRAVE_DEPTH = 0.5;
+
 function App() {
-  const [panels, setPanels] = useState<PanelEntry[]>([]);
-  const [gap, setGap] = useState(DEFAULT_GAP);
-  const [maxBlankHp, setMaxBlankHp] = useState(DEFAULT_MAX_BLANK_HP);
-  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
-  const [globalPattern, setGlobalPattern] = useState<PatternType>("none");
-  const [material, setMaterial] = useState<MaterialType>("mdf");
-  const [outputMode, setOutputMode] = useState<OutputMode>("laser-cut");
-  const [printColor, setPrintColor] = useState("#cccccc");
+  // The sheet as the visitor left it, read from the browser once on load
+  const [saved] = useState(loadWorkspace);
+  const [panels, setPanels] = useState<PanelEntry[]>(saved.panels);
+  const [gap, setGap] = useState(saved.gap);
+  const [maxBlankHp, setMaxBlankHp] = useState(saved.maxBlankHp);
+  const [splitMode, setSplitMode] = useState<SplitMode>(saved.splitMode);
+  const [globalPattern, setGlobalPattern] = useState<PatternType>(saved.globalPattern);
+  const [material, setMaterial] = useState<MaterialType>(saved.material);
+  const [outputMode, setOutputMode] = useState<OutputMode>(saved.outputMode);
+  const [printColor, setPrintColor] = useState(saved.printColor);
+  const [accentColor, setAccentColor] = useState(saved.accentColor);
+
+  // ...and kept up to date for the next visit
+  useEffect(() => {
+    saveWorkspace({ panels, gap, maxBlankHp, splitMode, globalPattern, material, outputMode, printColor, accentColor });
+  }, [panels, gap, maxBlankHp, splitMode, globalPattern, material, outputMode, printColor, accentColor]);
   const [stlPreview, setStlPreview] = useState<ArrayBuffer | null>(null);
   const [stlGenerating, setStlGenerating] = useState(false);
   const [stlPreviewError, setStlPreviewError] = useState<string | null>(null);
@@ -42,7 +64,7 @@ function App() {
   }) {
     const hpValues = splitBlank(panel.hp, maxBlankHp, splitMode);
     const entries: PanelEntry[] = hpValues.map((hp) => ({
-      id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+      id: newPanelId(),
       hp,
       format: panel.format,
       holeStyle: panel.holeStyle,
@@ -73,7 +95,7 @@ function App() {
     setPanels((prev) => {
       const source = prev.find((p) => p.id === id);
       if (!source) return prev;
-      const copy: PanelEntry = { ...source, id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2) };
+      const copy: PanelEntry = { ...source, id: newPanelId() };
       const idx = prev.indexOf(source);
       return [...prev.slice(0, idx + 1), copy, ...prev.slice(idx + 1)];
     });
@@ -95,7 +117,7 @@ function App() {
       const entries: PanelEntry[] = blanks.flatMap((b) => {
         const hpValues = splitBlank(b.hp, maxBlankHp, splitMode);
         return hpValues.map((hp) => ({
-          id: crypto.randomUUID?.() ?? Math.random().toString(36).slice(2),
+          id: newPanelId(),
           hp,
           format: b.format,
           holeStyle: "slot" as HoleStyle,
@@ -144,9 +166,20 @@ function App() {
 
     // Delay to let React render the loading state before blocking the main thread
     const timeout = setTimeout(() => {
-      const geo = generatePatternGeometry(previewPanel.pattern, previewPanel.spec.width, previewPanel.spec.height, previewPanel.patternSeed);
-      const engrave = outputMode === "laser-cut" ? "recess" as const : "extrude" as const;
-      generatePanelStl(previewPanel, 3, 0.5, geo, engrave)
+      // Surface patterns print as relief or bands; in laser mode they are engraved outlines like any other pattern
+      const surface = outputMode === "3d-print" ? parseSurfacePattern(previewPanel.pattern) : null;
+      const generate = () => {
+        if (surface) {
+          const height = surface.style === "relief" ? DEFAULT_RELIEF_HEIGHT : DEFAULT_PATTERN_HEIGHT;
+          return generateSurfacePanelStl(previewPanel, DEFAULT_PRINT_THICKNESS, height);
+        }
+        const geo = generatePatternGeometry(previewPanel.pattern, previewPanel.spec.width, previewPanel.spec.height, previewPanel.patternSeed);
+        if (outputMode === "laser-cut") {
+          return generatePanelStl(previewPanel, LASER_PREVIEW_SHEET_THICKNESS, LASER_PREVIEW_ENGRAVE_DEPTH, geo, "recess");
+        }
+        return generatePanelStl(previewPanel, DEFAULT_PRINT_THICKNESS, DEFAULT_PATTERN_HEIGHT, geo, "extrude");
+      };
+      generate()
         .then((stl) => { if (!cancelled) setStlPreview(stl); })
         .catch((e) => {
           if (!cancelled) setStlPreviewError(e instanceof Error ? e.message : "3D preview failed");
@@ -167,6 +200,9 @@ function App() {
   }
 
   const totalPanelCount = panels.reduce((sum, p) => sum + p.quantity, 0);
+  const hasBandsPanel = panels.some((p) => parseSurfacePattern(p.pattern)?.style === "bands");
+  const previewIsBands =
+    outputMode === "3d-print" && previewPanel !== null && parseSurfacePattern(previewPanel.pattern)?.style === "bands";
 
   return (
     <div className="min-h-screen bg-background text-foreground font-mono">
@@ -188,7 +224,7 @@ function App() {
       {/* Notice banner */}
       <div className="bg-primary/10 border-b border-primary/20 px-4 py-2 sm:px-6">
         <p className="max-w-5xl mx-auto text-xs text-primary/80">
-          <span className="font-semibold">New:</span> 3D Print mode is here! Export STL files with raised patterns, preview in 3D, and pick your filament color.
+          <span className="font-semibold">New:</span> patterns made for 3D printing. Sculpted relief and two-tone bands that fill the whole panel, from 2HP up. Switch the mode to 3D Print and pick one under Default pattern.
         </p>
       </div>
 
@@ -264,19 +300,17 @@ function App() {
 
             <div className="h-8 w-px bg-border hidden sm:block" />
 
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1 max-w-full">
               <Label htmlFor="pattern" className="text-xs">Default pattern</Label>
               <div className="flex gap-1.5">
                 <select
                   id="pattern"
                   value={globalPattern}
                   onChange={(e) => setGlobalPattern(e.target.value as PatternType)}
-                  className="h-9 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  className="h-9 min-w-0 rounded-sm border border-input bg-secondary px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   title="Pattern applied to newly added panels"
                 >
-                  {SORTED_PATTERN_ENTRIES.map(([value, label]) => (
-                    <option key={value} value={value}>{label}</option>
-                  ))}
+                  <PatternOptions />
                 </select>
                 {panels.length > 0 && (
                   <Button
@@ -305,7 +339,7 @@ function App() {
             <h2 className="text-primary text-sm font-semibold uppercase tracking-wider">3. Your Panels</h2>
             {panels.length > 0 ? (
               <span className="text-muted-foreground/50 text-xs">
-                {panels.length} {panels.length === 1 ? "panel" : "panels"}, {totalPanelCount} total on sheet &middot; edit any field inline
+                {panels.length} {panels.length === 1 ? "panel" : "panels"}, {totalPanelCount} total on sheet &middot; edit any field inline &middot; saved in this browser
               </span>
             ) : (
               <span className="text-muted-foreground/50 text-xs">No panels yet &mdash; add panels above to get started</span>
@@ -365,7 +399,7 @@ function App() {
                   </select>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <label className="text-xs text-muted-foreground/50">Filament color:</label>
                   {/* Preset swatches */}
                   {["#f0f0f0", "#2a2a2a", "#808080", "#cc3333", "#3355cc", "#33aa55", "#dd7722"].map((c) => (
@@ -384,6 +418,19 @@ function App() {
                     className="w-9 h-9 rounded-sm border border-input cursor-pointer"
                     title="Custom filament color"
                   />
+                  {hasBandsPanel && (
+                    <>
+                      <label htmlFor="accent-color" className="text-xs text-muted-foreground/50 ml-1.5">Bands:</label>
+                      <input
+                        id="accent-color"
+                        type="color"
+                        value={accentColor}
+                        onChange={(e) => setAccentColor(e.target.value)}
+                        className="w-9 h-9 rounded-sm border border-input cursor-pointer"
+                        title="Second filament, for two-tone bands"
+                      />
+                    </>
+                  )}
                 </div>
               )}
 
@@ -473,6 +520,7 @@ function App() {
               sheetHeight={layoutResult.sheetHeight}
               material={outputMode === "laser-cut" ? material : undefined}
               printColor={outputMode === "3d-print" ? printColor : undefined}
+              accentColor={accentColor}
             />
           )}
 
@@ -498,6 +546,8 @@ function App() {
                 <StlViewer
                   stlData={stlPreview}
                   color={outputMode === "3d-print" ? printColor : MATERIAL_CONFIG[material]?.panelFill ?? "#c0c0c0"}
+                  accentColor={previewIsBands ? accentColor : undefined}
+                  accentAboveZ={previewIsBands ? DEFAULT_PRINT_THICKNESS : undefined}
                   className="w-full h-[500px] rounded-sm border border-border overflow-hidden"
                 />
               )}

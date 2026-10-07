@@ -1,4 +1,13 @@
-import type { PatternType } from "../types";
+import type { LinePatternType, PatternType, SurfacePattern, SurfaceStyle } from "../types";
+import {
+  SURFACE_FIELDS,
+  SURFACE_STYLES,
+  SURFACE_STYLE_LABELS,
+  isSurfacePattern,
+  surfaceFieldLabel,
+} from "../surfaces/fields";
+import { sampleField } from "../surfaces/heightmap";
+import { traceContours } from "../surfaces/contours";
 import {
   type PatternGeometry,
   type Path2D,
@@ -918,6 +927,20 @@ function reactionDiffusion(w: number, h: number, seed: number): PatternGeometry 
 }
 
 // ---------------------------------------------------------------------------
+// Surface patterns as line art: the band edges, for engraving
+// ---------------------------------------------------------------------------
+
+/** Sample spacing used to trace the outlines (mm) */
+const CONTOUR_CELL = 0.5;
+
+function surfaceContours(pattern: SurfacePattern, w: number, h: number, seed: number): PatternGeometry {
+  const geo = emptyGeometry();
+  const { nx, ny, dx, dy, p } = sampleField(pattern, w, h, seed, CONTOUR_CELL);
+  for (const points of traceContours(p, nx, ny, dx, dy, 0.5)) geo.paths.push({ points });
+  return geo;
+}
+
+// ---------------------------------------------------------------------------
 // Registry
 // ---------------------------------------------------------------------------
 
@@ -953,11 +976,13 @@ export function generatePatternGeometry(
 ): PatternGeometry {
   if (pattern === "none") return emptyGeometry();
   const gen = generators[pattern];
-  if (!gen) return emptyGeometry();
-  return gen(width, height, seed);
+  if (gen) return gen(width, height, seed);
+  // Anything else renders nothing, including values from outside PatternType
+  if (typeof pattern !== "string" || !isSurfacePattern(pattern)) return emptyGeometry();
+  return surfaceContours(pattern, width, height, seed);
 }
 
-export const PATTERN_LABELS: Record<PatternType, string> = {
+export const PATTERN_LABELS: Record<LinePatternType, string> = {
   "none": "None",
   "spirograph": "Spirograph",
   "binary-matrix": "Binary Matrix",
@@ -989,3 +1014,22 @@ export const SORTED_PATTERN_ENTRIES: [string, string][] = (() => {
   const rest = entries.filter(([k]) => k !== "none").sort((a, b) => a[1].localeCompare(b[1]));
   return [none, ...rest];
 })();
+
+/**
+ * Surface patterns of one style, as [pattern, label] entries in field order.
+ * The style is part of each label, so a closed select still says which one it is.
+ */
+export function surfacePatternEntries(style: SurfaceStyle): [SurfacePattern, string][] {
+  return SURFACE_FIELDS.map((field) => [`${style}-${field}`, `${surfaceFieldLabel(field)} (${style})`]);
+}
+
+/** Heading for the surface patterns of one style */
+export function surfaceGroupLabel(style: SurfaceStyle): string {
+  return `${SURFACE_STYLE_LABELS[style]} (3D print)`;
+}
+
+/** Pattern choices grouped for the pattern selects: line art, then each surface style. "None" is not in any group. */
+export const PATTERN_GROUPS: { label: string; entries: [string, string][] }[] = [
+  { label: "Line art", entries: SORTED_PATTERN_ENTRIES.filter(([key]) => key !== "none") },
+  ...SURFACE_STYLES.map((style) => ({ label: surfaceGroupLabel(style), entries: surfacePatternEntries(style) })),
+];

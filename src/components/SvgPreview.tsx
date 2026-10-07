@@ -1,6 +1,8 @@
 import type { PlacedPanel, MaterialType } from "@/lib/types";
-import { SVG_MARGIN, SLOT_WIDTH, SLOT_HEIGHT, HOLE_DIAMETER } from "@/lib/constants";
+import { SVG_MARGIN, SLOT_WIDTH, SLOT_HEIGHT, HOLE_DIAMETER, DEFAULT_ACCENT_COLOR } from "@/lib/constants";
 import { generatePattern } from "@/lib/patterns";
+import { isSurfacePattern } from "@/lib/surfaces/fields";
+import { surfacePreviewImage } from "@/lib/surfaces/preview";
 
 export const MATERIAL_CONFIG: Record<MaterialType, {
   label: string;
@@ -78,6 +80,14 @@ interface SvgPreviewProps {
   sheetHeight: number;
   material?: MaterialType;
   printColor?: string;
+  /** Second filament, shown on two-tone band patterns in print mode */
+  accentColor?: string;
+}
+
+/** Filament colours of a print preview */
+interface PrintColors {
+  base: string;
+  accent: string;
 }
 
 /** Generate a material config from a filament color */
@@ -100,7 +110,7 @@ function printColorToMaterial(color: string): typeof MATERIAL_CONFIG[MaterialTyp
   };
 }
 
-function PreviewPanel({ pp, index, mat }: { pp: PlacedPanel; index: number; mat: typeof MATERIAL_CONFIG[MaterialType] }) {
+function PreviewPanel({ pp, index, mat, print }: { pp: PlacedPanel; index: number; mat: typeof MATERIAL_CONFIG[MaterialType]; print?: PrintColors }) {
   const s = pp.spec;
   const clipId = `panel-clip-${index}`;
   const isLaserView = mat.label === "Laser SVG (red/blue)";
@@ -166,8 +176,24 @@ function PreviewPanel({ pp, index, mat }: { pp: PlacedPanel; index: number; mat:
         </g>
       )}
 
+      {/* Surface pattern as it prints: lit relief or two-tone bands */}
+      {print && isSurfacePattern(pp.pattern) && (
+        <image
+          href={surfacePreviewImage(pp.pattern, s.width, s.height, pp.patternSeed, print.base, print.accent, {
+            holes: s.holes,
+            holeStyle: s.holeStyle,
+          })}
+          x={0}
+          y={0}
+          width={s.width}
+          height={s.height}
+          preserveAspectRatio="none"
+          clipPath={`url(#${clipId})`}
+        />
+      )}
+
       {/* Engrave pattern — clipped to panel */}
-      {pp.pattern !== "none" && (
+      {pp.pattern !== "none" && !(print && isSurfacePattern(pp.pattern)) && (
         <g
           opacity={0.8}
           clipPath={`url(#${clipId})`}
@@ -223,11 +249,13 @@ export default function SvgPreview({
   sheetHeight,
   material,
   printColor,
+  accentColor,
 }: SvgPreviewProps) {
   const margin = SVG_MARGIN;
   const vw = sheetWidth + 2 * margin;
   const vh = sheetHeight + 2 * margin;
   const mat = printColor ? printColorToMaterial(printColor) : MATERIAL_CONFIG[material ?? "mdf"];
+  const print = printColor ? { base: printColor, accent: accentColor ?? DEFAULT_ACCENT_COLOR } : undefined;
 
   if (placed.length === 0) {
     return (
@@ -262,7 +290,7 @@ export default function SvgPreview({
 
         <g transform={`translate(${margin},${margin})`}>
           {placed.map((pp, i) => (
-            <PreviewPanel key={i} pp={pp} index={i} mat={mat} />
+            <PreviewPanel key={i} pp={pp} index={i} mat={mat} print={print} />
           ))}
         </g>
 

@@ -1,6 +1,9 @@
 import type { PatternGeometry } from "../pattern-geometry/types";
 import type { PlacedPanel } from "../types";
-import { HOLE_DIAMETER, SLOT_WIDTH, SLOT_HEIGHT } from "../constants";
+import { parseSurfacePattern } from "../surfaces/fields";
+import type { ManifoldToplevel } from "manifold-3d";
+import { getManifold, meshToStl, scoped, subtractHoles, toPrintFrame, type Own } from "./manifold";
+import { generateSurfacePanelStl } from "./surface-stl-renderer";
 
 /**
  * STL renderer using manifold-3d.
@@ -8,23 +11,6 @@ import { HOLE_DIAMETER, SLOT_WIDTH, SLOT_HEIGHT } from "../constants";
  * Converts panel specs + pattern geometry into binary STL data.
  * All dimensions in mm. The panel sits on the XY plane with Z up.
  */
-
-// manifold-3d is loaded lazily since it's a WASM module
-let manifoldModule: any = null;
-
-async function getManifold() {
-  if (manifoldModule) return manifoldModule;
-  try {
-    const Module = (await import("manifold-3d")).default;
-    const wasm = await Module();
-    wasm.setup();
-    manifoldModule = wasm;
-    return wasm;
-  } catch (e) {
-    manifoldModule = null; // allow retry on next call
-    throw new Error(`Failed to load 3D engine: ${e instanceof Error ? e.message : "unknown error"}`);
-  }
-}
 
 /**
  * Generate a 3D mesh for a single panel and return binary STL data.
@@ -36,45 +22,36 @@ export async function generatePanelStl(
   patternGeometry: PatternGeometry,
   engraveMode: "extrude" | "recess" = "extrude"
 ): Promise<ArrayBuffer> {
-  const { Manifold, CrossSection } = await getManifold();
+  const wasm = await getManifold();
+
+  return scoped((own) => {
+    const body = buildPanelBody(wasm, own, panel, thickness, patternHeight, patternGeometry, engraveMode);
+    // Export as binary STL
+    return meshToStl(own(toPrintFrame(body, panel.spec.height)).getMesh());
+  });
+}
+
+/**
+ * Build the panel solid in sheet coordinates. Every manifold-3d object made
+ * along the way goes through `own`, so the caller's scope frees them.
+ */
+function buildPanelBody(
+  wasm: ManifoldToplevel,
+  own: Own,
+  panel: PlacedPanel,
+  thickness: number,
+  patternHeight: number,
+  patternGeometry: PatternGeometry,
+  engraveMode: "extrude" | "recess"
+): any {
+  const { Manifold, CrossSection } = wasm;
   const spec = panel.spec;
 
   // 1. Panel body
-  let body = Manifold.cube([spec.width, spec.height, thickness]);
+  let body = own(Manifold.cube([spec.width, spec.height, thickness]));
 
   // 2. Subtract mounting holes
-  for (const [cx, cy] of spec.holes) {
-    let holeCrossSection: any;
-
-    if (spec.holeStyle === "circle") {
-      holeCrossSection = CrossSection.circle(HOLE_DIAMETER / 2, 32);
-    } else {
-      // Slot: stadium shape (rectangle with semicircle caps on left/right)
-      // SLOT_WIDTH > SLOT_HEIGHT, so caps are semicircles of radius SLOT_HEIGHT/2
-      const hw = SLOT_WIDTH / 2;  // half width (horizontal)
-      const r = SLOT_HEIGHT / 2;  // cap radius = half height
-      const straight = hw - r;    // length of straight section
-
-      const points: [number, number][] = [];
-      const steps = 16;
-      // Right semicircle (from -90 to +90 degrees)
-      for (let i = 0; i <= steps; i++) {
-        const angle = -Math.PI / 2 + (i / steps) * Math.PI;
-        points.push([straight + Math.cos(angle) * r, Math.sin(angle) * r]);
-      }
-      // Left semicircle (from +90 to +270 degrees)
-      for (let i = 0; i <= steps; i++) {
-        const angle = Math.PI / 2 + (i / steps) * Math.PI;
-        points.push([-straight + Math.cos(angle) * r, Math.sin(angle) * r]);
-      }
-
-      holeCrossSection = CrossSection.ofPolygons([points]);
-    }
-
-    const hole = Manifold.extrude(holeCrossSection, thickness + 1)
-      .translate([cx, cy, -0.5]);
-    body = body.subtract(hole);
-  }
+  body = own(subtractHoles(wasm, body, spec, thickness));
 
   // 3. Extrude pattern geometry on top of the panel
   // Strategy: build 2D cross-sections using CrossSection.hull() for smooth
@@ -82,33 +59,42 @@ export async function generatePanelStl(
   // extrude the merged 2D shape once into 3D.
   if (patternHeight > 0) {
     const patternMeshes: any[] = [];
-    const strokeR = 0.125; // half stroke width
-    const circleRes = 8; // resolution for stroke circles (low is fine at 0.25mm)
+    // Raised lines are one nozzle line wide (0.45mm) so a slicer keeps them;
+    // recessed lines stay at the 0.25mm engrave width.
+    const strokeR = engraveMode === "extrude" ? 0.225 : 0.125;
+    const circleRes = 8; // resolution for stroke circles (low is fine at this size)
     const MAX_MESHES = 500; // limit total 3D meshes
+
+    // One stroke-width dot, moved to each end of a segment
+    const dot = own(CrossSection.circle(strokeR, circleRes));
+
+    // Helper: build a 2D cross-section for a single line segment
+    function lineToCrossSection(x1: number, y1: number, x2: number, y2: number): any {
+      return own(CrossSection.hull([own(dot.translate([x1, y1])), own(dot.translate([x2, y2]))]));
+    }
 
     // Helper: build a 2D cross-section from a polyline by hulling circles at each segment
     function pathToCrossSection(points: [number, number][]): any {
       let shape: any = null;
       for (let i = 0; i < points.length - 1; i++) {
-        const seg = CrossSection.hull([
-          CrossSection.circle(strokeR, circleRes).translate(points[i]),
-          CrossSection.circle(strokeR, circleRes).translate(points[i + 1]),
-        ]);
-        shape = shape ? shape.add(seg) : seg;
+        const seg = lineToCrossSection(points[i][0], points[i][1], points[i + 1][0], points[i + 1][1]);
+        shape = shape ? own(shape.add(seg)) : seg;
       }
       return shape;
     }
 
-    // Helper: build a 2D cross-section for a single line segment
-    function lineToCrossSection(x1: number, y1: number, x2: number, y2: number): any {
-      return CrossSection.hull([
-        CrossSection.circle(strokeR, circleRes).translate([x1, y1]),
-        CrossSection.circle(strokeR, circleRes).translate([x2, y2]),
-      ]);
-    }
-
     // Clip cross-section to panel bounds
-    const panelClip = CrossSection.square([spec.width, spec.height]);
+    const panelClip = own(CrossSection.square([spec.width, spec.height]));
+
+    // Clip a 2D shape to the panel and extrude what is left onto the face
+    // (or down into it, for recessed patterns)
+    const zOffset = engraveMode === "recess" ? thickness - patternHeight : thickness;
+    function addToPattern(shape: any) {
+      const clipped = own(shape.intersect(panelClip));
+      if (clipped.area() > 0) {
+        patternMeshes.push(own(own(Manifold.extrude(clipped, patternHeight)).translate([0, 0, zOffset])));
+      }
+    }
 
     // --- Lines ---
     // Group all lines into one 2D cross-section, then extrude once
@@ -119,16 +105,9 @@ export async function generatePanelStl(
       for (let i = 0; i < lines.length; i += step) {
         const { x1, y1, x2, y2 } = lines[i];
         const seg = lineToCrossSection(x1, y1, x2, y2);
-        lineShape = lineShape ? lineShape.add(seg) : seg;
+        lineShape = lineShape ? own(lineShape.add(seg)) : seg;
       }
-      if (lineShape) {
-        lineShape = lineShape.intersect(panelClip);
-        if (lineShape.area() > 0) {
-          patternMeshes.push(
-            Manifold.extrude(lineShape, patternHeight).translate([0, 0, engraveMode === "recess" ? thickness - patternHeight : thickness])
-          );
-        }
-      }
+      if (lineShape) addToPattern(lineShape);
     }
 
     // --- Paths ---
@@ -146,14 +125,7 @@ export async function generatePanelStl(
         sampled = pts.filter((_, i) => i % s === 0 || i === pts.length - 1);
       }
       const shape = pathToCrossSection(sampled);
-      if (shape) {
-        const clipped = shape.intersect(panelClip);
-        if (clipped.area() > 0) {
-          patternMeshes.push(
-            Manifold.extrude(clipped, patternHeight).translate([0, 0, engraveMode === "recess" ? thickness - patternHeight : thickness])
-          );
-        }
-      }
+      if (shape) addToPattern(shape);
     }
 
     // --- Circles ---
@@ -161,28 +133,16 @@ export async function generatePanelStl(
       if (patternMeshes.length >= MAX_MESHES) break;
       if (circle.cx + circle.r < 0 || circle.cx - circle.r > spec.width ||
           circle.cy + circle.r < 0 || circle.cy - circle.r > spec.height) continue;
-      const outer = CrossSection.circle(circle.r + strokeR, 32).translate([circle.cx, circle.cy]);
-      const inner = CrossSection.circle(Math.max(0.05, circle.r - strokeR), 32).translate([circle.cx, circle.cy]);
-      const ring = outer.subtract(inner).intersect(panelClip);
-      if (ring.area() > 0) {
-        patternMeshes.push(
-          Manifold.extrude(ring, patternHeight).translate([0, 0, engraveMode === "recess" ? thickness - patternHeight : thickness])
-        );
-      }
+      const outer = own(own(CrossSection.circle(circle.r + strokeR, 32)).translate([circle.cx, circle.cy]));
+      const inner = own(own(CrossSection.circle(Math.max(0.05, circle.r - strokeR), 32)).translate([circle.cx, circle.cy]));
+      addToPattern(own(outer.subtract(inner)));
     }
 
     // --- Polygons ---
     for (const polygon of patternGeometry.polygons) {
       if (polygon.points.length < 3 || patternMeshes.length >= MAX_MESHES) continue;
       const shape = pathToCrossSection([...polygon.points, polygon.points[0]]);
-      if (shape) {
-        const clipped = shape.intersect(panelClip);
-        if (clipped.area() > 0) {
-          patternMeshes.push(
-            Manifold.extrude(clipped, patternHeight).translate([0, 0, engraveMode === "recess" ? thickness - patternHeight : thickness])
-          );
-        }
-      }
+      if (shape) addToPattern(shape);
     }
 
     // --- Rects ---
@@ -191,14 +151,7 @@ export async function generatePanelStl(
       const { x, y, width, height } = rect;
       const corners: [number, number][] = [[x, y], [x + width, y], [x + width, y + height], [x, y + height], [x, y]];
       const shape = pathToCrossSection(corners);
-      if (shape) {
-        const clipped = shape.intersect(panelClip);
-        if (clipped.area() > 0) {
-          patternMeshes.push(
-            Manifold.extrude(clipped, patternHeight).translate([0, 0, engraveMode === "recess" ? thickness - patternHeight : thickness])
-          );
-        }
-      }
+      if (shape) addToPattern(shape);
     }
 
     // Texts — render "0" and "1" as 3D polygon glyphs
@@ -209,126 +162,46 @@ export async function generatePanelStl(
       const sw = text.fontSize * 0.12; // stroke width for "0" outline
       const cx = text.x + w / 2;
       const cy = text.y - h * 0.35;
-      const zOff = engraveMode === "recess" ? thickness - patternHeight : thickness;
 
       let glyph: any = null;
 
       if (text.text === "1") {
-        // "1" = thin vertical bar with a serif foot and angled top
+        // "1" = thin vertical bar with a serif foot and angled top.
+        // Sheet coordinates: the top of the glyph is at the smaller y.
         const barW = w * 0.3;
-        const bar = CrossSection.square([barW, h]).translate([cx - barW / 2, cy - h / 2]);
-        const foot = CrossSection.square([w * 0.6, sw]).translate([cx - w * 0.3, cy - h / 2]);
-        const serif = CrossSection.ofPolygons([[
-          [cx - barW / 2, cy + h / 2],
-          [cx - w * 0.35, cy + h * 0.3],
-          [cx - barW / 2, cy + h * 0.3],
-        ]]);
-        glyph = bar.add(foot).add(serif);
+        const bar = own(own(CrossSection.square([barW, h])).translate([cx - barW / 2, cy - h / 2]));
+        const foot = own(own(CrossSection.square([w * 0.6, sw])).translate([cx - w * 0.3, cy + h / 2 - sw]));
+        const serif = own(CrossSection.ofPolygons([[
+          [cx - barW / 2, cy - h / 2],
+          [cx - barW / 2, cy - h * 0.3],
+          [cx - w * 0.35, cy - h * 0.3],
+        ]]));
+        glyph = own(own(bar.add(foot)).add(serif));
       } else if (text.text === "0") {
         // "0" = ellipse ring (outer - inner)
-        const outer = CrossSection.circle(1, 16)
-          .scale([w / 2, h / 2])
-          .translate([cx, cy]);
-        const inner = CrossSection.circle(1, 16)
-          .scale([w / 2 - sw, h / 2 - sw])
-          .translate([cx, cy]);
-        glyph = outer.subtract(inner);
+        const outer = own(own(own(CrossSection.circle(1, 16))
+          .scale([w / 2, h / 2]))
+          .translate([cx, cy]));
+        const inner = own(own(own(CrossSection.circle(1, 16))
+          .scale([w / 2 - sw, h / 2 - sw]))
+          .translate([cx, cy]));
+        glyph = own(outer.subtract(inner));
       }
 
-      if (glyph) {
-        const clipped = glyph.intersect(panelClip);
-        if (clipped.area() > 0) {
-          patternMeshes.push(
-            Manifold.extrude(clipped, patternHeight).translate([0, 0, zOff])
-          );
-        }
-      }
+      if (glyph) addToPattern(glyph);
     }
 
-    // Add (extrude) or subtract (recess) pattern from panel body
+    // Add (extrude) or subtract (recess) pattern from panel body.
+    // The strokes overlap each other, so they are merged with a real union
+    // first: concatenating them leaves the export open, and can crash the
+    // boolean that follows.
     if (patternMeshes.length > 0) {
-      if (engraveMode === "recess") {
-        // Recess requires proper boolean subtraction — union first for watertight mesh
-        const pattern = Manifold.union(patternMeshes);
-        body = body.subtract(pattern);
-      } else {
-        // Extrude can use fast compose (concatenation)
-        const pattern = Manifold.compose(patternMeshes);
-        body = body.add(pattern);
-      }
+      const pattern = own(Manifold.union(patternMeshes));
+      body = own(engraveMode === "recess" ? body.subtract(pattern) : body.add(pattern));
     }
   }
 
-  // 4. Export as binary STL
-  return meshToStl(body.getMesh());
-}
-
-
-/**
- * Convert a manifold mesh to binary STL format.
- */
-function meshToStl(mesh: any): ArrayBuffer {
-  const numTri = mesh.numTri;
-  const numProp = mesh.numProp;
-  const vertProps = mesh.vertProperties;
-  const triVerts = mesh.triVerts;
-
-  // Binary STL: 80 byte header + 4 byte triangle count + 50 bytes per triangle
-  const bufferSize = 80 + 4 + numTri * 50;
-  const buffer = new ArrayBuffer(bufferSize);
-  const view = new DataView(buffer);
-
-  // Header (80 bytes) — "rackcut"
-  const header = new TextEncoder().encode("rackcut STL export");
-  new Uint8Array(buffer, 0, header.length).set(header);
-
-  // Triangle count
-  view.setUint32(80, numTri, true);
-
-  let offset = 84;
-  for (let t = 0; t < numTri; t++) {
-    const i0 = triVerts[t * 3];
-    const i1 = triVerts[t * 3 + 1];
-    const i2 = triVerts[t * 3 + 2];
-
-    // Get vertices
-    const v0 = [vertProps[i0 * numProp], vertProps[i0 * numProp + 1], vertProps[i0 * numProp + 2]];
-    const v1 = [vertProps[i1 * numProp], vertProps[i1 * numProp + 1], vertProps[i1 * numProp + 2]];
-    const v2 = [vertProps[i2 * numProp], vertProps[i2 * numProp + 1], vertProps[i2 * numProp + 2]];
-
-    // Compute normal
-    const e1 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]];
-    const e2 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]];
-    const nx = e1[1] * e2[2] - e1[2] * e2[1];
-    const ny = e1[2] * e2[0] - e1[0] * e2[2];
-    const nz = e1[0] * e2[1] - e1[1] * e2[0];
-    const nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-
-    // Normal
-    view.setFloat32(offset, nx / nl, true); offset += 4;
-    view.setFloat32(offset, ny / nl, true); offset += 4;
-    view.setFloat32(offset, nz / nl, true); offset += 4;
-
-    // Vertex 1
-    view.setFloat32(offset, v0[0], true); offset += 4;
-    view.setFloat32(offset, v0[1], true); offset += 4;
-    view.setFloat32(offset, v0[2], true); offset += 4;
-
-    // Vertex 2
-    view.setFloat32(offset, v1[0], true); offset += 4;
-    view.setFloat32(offset, v1[1], true); offset += 4;
-    view.setFloat32(offset, v1[2], true); offset += 4;
-
-    // Vertex 3
-    view.setFloat32(offset, v2[0], true); offset += 4;
-    view.setFloat32(offset, v2[1], true); offset += 4;
-    view.setFloat32(offset, v2[2], true); offset += 4;
-
-    // Attribute byte count (unused)
-    view.setUint16(offset, 0, true); offset += 2;
-  }
-
-  return buffer;
+  return body;
 }
 
 /**
@@ -339,7 +212,8 @@ export async function generateAllPanelsStlZip(
   thickness: number,
   patternHeight: number,
   getGeometry: (panel: PlacedPanel) => PatternGeometry,
-  engraveMode: "extrude" | "recess" = "extrude"
+  engraveMode: "extrude" | "recess" = "extrude",
+  reliefHeight: number = patternHeight
 ): Promise<Blob> {
   // Simple ZIP implementation (no compression — STL is binary, compression saves little)
   const files: { name: string; data: ArrayBuffer }[] = [];
@@ -348,8 +222,10 @@ export async function generateAllPanelsStlZip(
   for (let i = 0; i < panels.length; i++) {
     const panel = panels[i];
     try {
-      const geometry = getGeometry(panel);
-      const stlData = await generatePanelStl(panel, thickness, patternHeight, geometry, engraveMode);
+      const surface = parseSurfacePattern(panel.pattern);
+      const stlData = surface
+        ? await generateSurfacePanelStl(panel, thickness, surface.style === "relief" ? reliefHeight : patternHeight)
+        : await generatePanelStl(panel, thickness, patternHeight, getGeometry(panel), engraveMode);
       const name = `${panel.label.replace(/\s+/g, "-")}-${panel.patternSeed}.stl`;
       files.push({ name, data: stlData });
     } catch (e) {
