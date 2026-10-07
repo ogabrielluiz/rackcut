@@ -1,11 +1,19 @@
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { generatePattern, SORTED_PATTERN_ENTRIES } from "@/lib/patterns";
+import { surfaceGroupLabel, surfacePatternEntries } from "@/lib/pattern-geometry";
+import { SURFACE_STYLES } from "@/lib/surfaces/fields";
+import { surfacePreviewImage } from "@/lib/surfaces/preview";
 import type { PatternType } from "@/lib/types";
 import { ENGRAVE_COLOR } from "@/lib/constants";
 
 const PREVIEW_WIDTH = 101.3; // ~20HP panel
 const PREVIEW_HEIGHT = 128.5; // 3U
+
+// Gallery filaments: relief in one light colour, bands in the gallery's gold on dark
+const RELIEF_COLOR = "#b9b6ad";
+const BANDS_BASE_COLOR = "#1a1a2a";
+const BANDS_ACCENT_COLOR = "#c8b870";
 
 export default function PatternPreview() {
   const [open, setOpen] = useState(false);
@@ -20,6 +28,23 @@ export default function PatternPreview() {
         svg: generatePattern(key as PatternType, PREVIEW_WIDTH, PREVIEW_HEIGHT, seed),
       }));
   }, [seed]);
+
+  // Rendered only while the gallery is open: each preview samples a full panel
+  const surfaceGroups = useMemo(() => {
+    if (!open) return [];
+    return SURFACE_STYLES.map((style) => ({
+      style,
+      label: surfaceGroupLabel(style),
+      items: surfacePatternEntries(style).map(([key, label]) => ({
+        key,
+        label,
+        image:
+          style === "relief"
+            ? surfacePreviewImage(key, PREVIEW_WIDTH, PREVIEW_HEIGHT, seed, RELIEF_COLOR, RELIEF_COLOR)
+            : surfacePreviewImage(key, PREVIEW_WIDTH, PREVIEW_HEIGHT, seed, BANDS_BASE_COLOR, BANDS_ACCENT_COLOR),
+      })),
+    }));
+  }, [open, seed]);
 
   if (!open) {
     return (
@@ -48,6 +73,7 @@ export default function PatternPreview() {
       </div>
 
       <div className="max-h-[60vh] overflow-y-auto">
+      <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mb-2">Line art</h4>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
         {patterns.map(({ key, label, svg }) => (
           <div key={key} className="flex flex-col gap-1">
@@ -84,6 +110,22 @@ export default function PatternPreview() {
           </div>
         ))}
       </div>
+
+      {surfaceGroups.map((group) => (
+        <div key={group.style}>
+          <h4 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider mt-5 mb-2">{group.label}</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {group.items.map(({ key, label, image }) => (
+              <div key={key} className="flex flex-col gap-1">
+                <div className="bg-[#0c0c0c] rounded-sm p-2 aspect-[101.3/128.5] flex items-center justify-center">
+                  <img src={image} alt={label} className="w-full h-full rounded-[1px]" />
+                </div>
+                <span className="text-xs text-muted-foreground text-center">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
       </div>
     </div>
   );

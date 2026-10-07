@@ -15,7 +15,7 @@ import { generatePatternGeometry } from "./pattern-geometry";
 import { renderPatternToSvg } from "./renderers/svg-renderer";
 
 // Re-export from pattern-geometry for backwards compatibility
-export { PATTERN_LABELS, SORTED_PATTERN_ENTRIES } from "./pattern-geometry";
+export { PATTERN_LABELS, SORTED_PATTERN_ENTRIES, PATTERN_GROUPS } from "./pattern-geometry";
 export { generatePatternGeometry } from "./pattern-geometry";
 
 const STROKE_WIDTH = 0.25;
